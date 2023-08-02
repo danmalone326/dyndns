@@ -1,0 +1,558 @@
+#!/usr/bin/python3
+import sys
+import os
+# import cgi
+from urllib.parse import parse_qsl, parse_qs
+import re
+import json
+
+# sudo pip3 install dnspython
+import dns.resolver
+import dns
+
+# enable debugging features
+debug = True
+
+authorizedHostsFilename = "data/authorizedHosts.json"
+zoneInfoFilename = "data/zoneInfo.json"
+
+# make global
+# formFields = cgi.FieldStorage()
+# formFields = dict(parse_qsl(os.environ.get("QUERY_STRING", "")))
+# changed from parse_qsl to parse_qs to handle multiple txt values
+formFields = dict(parse_qs(os.environ.get("QUERY_STRING", "")))
+
+# returns true if the string is an IPv4 Address (original from chatGPT)
+def isValidIPv4Address(str):
+    try:
+        dns.ipv4.inet_aton(str)
+        return True
+    except Exception:
+        return False
+        # try:
+        #     dns.ipv6.inet_aton(text, True)
+        #     return AF_INET6
+        # except Exception:
+        #     raise ValueError
+
+    # try:
+    #     # Split the address into its individual octets
+    #     octets = str.split('.')
+
+    #     # Ensure that there are exactly 4 octets
+    #     if len(octets) != 4:
+    #         return False
+
+    #     # Convert each octet to an integer and check if it's within the valid range
+    #     for octet in octets:
+    #         try:
+    #             # Check for leading zeros
+    #             if ((len(octet) > 1) and (octet[0] == "0")):
+    #                 return False
+                
+    #             value = int(octet)
+    #             if ((value < 0) or (value > 255)):
+    #                 return False
+                
+    #             # Check if the octet contains only ASCII digits (0-9)
+    #             if (not re.match(r'^[0-9]+$', octet)):
+    #                 return False
+
+    #         except ValueError:
+    #             return False
+
+    #     return True
+
+    # except:
+    #     return False
+
+# returns true if the string is an IPv6 Address (original from chatGPT)
+def isValidIPv6Address(str):
+    try:
+        # Split the address into its individual parts
+        parts = str.split(':')
+
+        # Ensure that there are no more than 8 parts
+        if (len(parts) > 8):
+            return False
+        # print("here: " + str)
+
+        # Count the number of compressed parts "::" and check if they are at most 1
+        compressedParts = str.count('::')
+        if (compressedParts > 1):
+            return False
+        
+        # if no compression, then we need exactly 8 parts
+        if ((compressedParts == 0) and (len(parts) != 8)):
+            return False
+        
+        # can not start or end with a single colon
+        if (((str[0] == ":") and (str[1] != ":")) or ((str[-1] == ":") and (str[-2] != ":"))):
+            return False
+
+        # Check if each part is a valid hexadecimal value (0-9, A-F, a-f)
+        for part in parts:
+            if (not re.match(r'^[0-9A-Fa-f]{0,4}$', part)):
+                return False
+
+        return True
+
+    except:
+        return False
+    
+def isValidIPAddress(str):
+    return isValidIPv4Address(str) or isValidIPv6Address(str)
+
+    
+def isValidFQDN(str):
+    try:
+        # Check if the length of the FQDN is within the valid limit
+        if (len(str) > 255):
+            return False
+
+        # Split the FQDN into individual labels
+        labels = str.split('.')
+
+        # Check each label for length and validity
+        for label in labels:
+            if len(label) > 63:
+                return False
+            
+            # regex is not perfect, but handles most scenarios
+            if (not re.match(r'^(?:[a-zA-Z0-9_][a-zA-Z0-9-]*)?[a-zA-Z0-9]$', label)):
+                return False
+
+        return True
+
+    except:
+        return False
+    
+def getIpList():
+    result = []
+
+    # first we'll get all the options
+    myipAll = formFields.get("myip",[])
+    xForwardedFor = os.environ.get("HTTP_X_FORWARDED_FOR",None)
+    if (xForwardedFor):
+        xForwardedFor = xForwardedFor.split()[-1]
+    xClientIP = os.environ.get("HTTP_X_CLIENT_IP",None)
+    clientIP = os.environ.get("HTTP_CLIENT_IP",None)
+    remoteAddr = os.environ.get("REMOTE_ADDR",None)
+
+    # print(myip)
+    # print(xForwardedFor)
+    # print(xClientIP)
+    # print(clientIP)
+    # print(remoteAddr)
+
+    # now we'll pick the first valid one
+    result = []
+    
+    # special case for myip parameter because we allow multiple ips
+    # print("myip")
+    myipList = []
+    if (len(myipAll) > 0):
+        for myipOne in myipAll:
+            for ip in myipOne.split(','):
+                if (isValidIPAddress(ip)):
+                    myipList.append(ip)
+
+    if (len(myipList) > 0):
+        result = myipList
+    elif (isValidIPAddress(xForwardedFor)):
+        # print("xForwardedFor")
+        result = [xForwardedFor]
+    elif (isValidIPAddress(xClientIP)):
+        # print("xClientIP")
+        result = [xClientIP]
+    elif (isValidIPAddress(clientIP)):
+        # print("clientIP")
+        result = [clientIP]
+    elif (isValidIPAddress(remoteAddr)):
+        # print("remoteAddr")
+        result = [remoteAddr]
+
+    return result
+
+def getHostnameList():
+    result = []
+
+    # first we'll get all the options
+    hostnameAll = formFields.get("hostname",[])
+    if (len(hostnameAll) > 0):
+        for hostnameOne in hostnameAll:
+            for hostname in hostnameOne.split(','):
+                result.append(hostname)
+
+    return result
+
+def getTxtParam():
+    # get all the options
+    result = formFields.get("txt",[])
+    return result
+    
+allowedDeleteValues = ["A","AAAA","TXT"]
+def getDeleteParam():
+    result = []
+    deleteAll = formFields.get("delete",[])
+    if (len(deleteAll) > 0):
+        for deleteOne in deleteAll:
+            for value in deleteOne.split(','):
+                if ((value in allowedDeleteValues) and (value not in result)):
+                    result.append(value)
+                elif (value == "ALL"):
+                    result = allowedDeleteValues
+                    break
+
+    return result
+
+def getAuthorizedUser():
+    return os.environ.get("REMOTE_USER",None)
+
+def getFQDNPatterns(username):
+    result = []
+    try:
+        with open(authorizedHostsFilename, 'r') as f:
+            data = json.load(f)
+
+            for entry in data:
+                if (entry["username"] == username):
+                    for pattern in entry["patterns"]:
+                        rePattern = ("^" + pattern + "$").replace('.','\\.').replace('*','.*')
+                        thisPattern = { "regex": rePattern, "zone": entry["zone"] }
+                        result.append(thisPattern)
+        
+        return result
+
+    except:
+        problemStop()
+    
+def getZoneInfo(zone):
+    try:
+        with open(zoneInfoFilename, 'r') as f:
+            data = json.load(f)
+
+            for entry in data:
+                if (entry["name"] == zone):
+                    return entry
+
+        problemStop()     
+
+    except:
+        problemStop()
+    
+def getFQDNZone(hostname,allowedPatterns):
+    for pattern in allowedPatterns:
+        if (re.match(pattern["regex"],hostname)):
+            return pattern["zone"]
+    return None
+
+def isAuthorizedFQDN(hostname,allowedPatterns):
+    zone = getFQDNZone(hostname,allowedPatterns)
+    if (zone is not None):
+        return True
+    else:
+        return False
+
+def getCurrentDNS(hostname,recordType,nameServerIP):
+    resolver = dns.resolver.Resolver()
+    resolver.nameservers = [nameServerIP]
+
+    result = []
+    try:
+        answers = resolver.query(hostname, rdtype=recordType)
+        result.extend(str(answer) for answer in answers)
+    except dns.resolver.NXDOMAIN:
+        # name does not exist
+        pass
+    except dns.resolver.NoAnswer:
+        # no results for this type
+        pass
+    except:
+        dnserrStop()
+    
+    return result
+
+def printNoCacheHeaders():
+    print("Cache-Control: no-cache, no-store, max-age=0, must-revalidate")
+    print("Expires: Mon, 01 Jan 1990 00:00:00 GMT")
+    print("Pragma: no-cache")
+
+def stopMessage(str):
+    print(str)
+    sys.exit(0)
+
+def problemStop():
+    stopMessage("911")
+
+def dnserrStop():
+    stopMessage("dnserr")
+
+def checkip():
+    print("Content-type: text/plain")
+    printNoCacheHeaders()
+    print("")
+
+    for ip in getIpList():
+        print(ip)
+
+def checkParams():
+    print("Content-type: text/plain")
+    printNoCacheHeaders()
+    print("")
+
+    print("Hostnames:")
+    hostnameList = getHostnameList()
+    for hostname in hostnameList:
+        print(hostname)
+
+    print("")
+    print("Valid IPs:")
+    ipList = getIpList()
+    for ip in ipList:
+        print(ip)
+
+    print("")
+    print("TXT:")
+    txtParam = getTxtParam()
+    print(txtParam)
+
+    print("")
+    print("Delete:")
+    deleteParam = getDeleteParam()
+    print(deleteParam)
+
+    print("")
+
+def updateIPs(hostname, ipList, zoneInfo):
+    currentIPs = getCurrentDNS(hostname,"A",zoneInfo["nameServerIP"])
+    currentIPs.extend(getCurrentDNS(hostname,"AAAA",zoneInfo["nameServerIP"]))
+
+    print(currentIPs)
+    print(ipList)
+
+    currentUnique = set(currentIPs)
+    newUnique = set(ipList)
+
+    defaultTTL = "30"
+    # if there are any differences, we will always do the same
+    if (newUnique.symmetric_difference(currentUnique)):
+        update = []
+        update.append(f'server {zoneInfo["nameServerIP"]}')
+        update.append(f'zone {zoneInfo["name"]}')
+        update.append(f'del {hostname} A')
+        update.append(f'del {hostname} AAAA')
+        for ip in newUnique:
+            if (isValidIPv4Address(ip)):
+                rType = "A"
+            else:
+                rType = "AAAA"
+            update.append(f'add {hostname} {defaultTTL} {rType} {ip}')
+        update.append(f'send')
+        update.append(f'quit')
+        print("\n".join(update))
+        print("good " + ','.join(newUnique))
+    else:
+        # no update needed
+        print("nochg " + ','.join(currentIPs))
+
+def updateTXT(hostname, newTXTs, zoneInfo):
+    # update to support multiple txt records
+    currentTXTs = getCurrentDNS(hostname,"TXT",zoneInfo["nameServerIP"])
+
+    print(currentTXTs)
+    print(newTXTs)
+
+    currentUnique = set(currentTXTs)
+    newUnique = set(newTXTs)
+
+    defaultTTL = "0"
+    # if there are any differences, we will always do the same
+    if (newUnique.symmetric_difference(currentUnique)):
+        update = []
+        update.append(f'server {zoneInfo["nameServerIP"]}')
+        update.append(f'zone {zoneInfo["name"]}')
+        update.append(f'del {hostname} TXT')
+        for ip in newUnique:
+            rType = "TXT"
+            update.append(f'add {hostname} {defaultTTL} {rType} {ip}')
+        update.append(f'send')
+        update.append(f'quit')
+        print("\n".join(update))
+        print("good " + ','.join(newUnique))
+    else:
+        # no update needed
+        print("nochg " + ','.join(currentTXTs))
+
+def delete(hostname, deleteTypes, zoneInfo):
+    deletesNeeded = False
+    for type in deleteTypes:
+        if (len(getCurrentDNS(hostname,type,zoneInfo["nameServerIP"])) > 0):
+            deletesNeeded = True
+            break
+    
+    # if deletes are needed
+    if (deletesNeeded):
+        update = []
+        update.append(f'server {zoneInfo["nameServerIP"]}')
+        update.append(f'zone {zoneInfo["name"]}')
+        for type in deleteTypes: 
+            update.append(f'del {hostname} {type}')
+        update.append(f'send')
+        update.append(f'quit')
+        print("\n".join(update))
+        print("good")
+    else:
+        # no update needed
+        print("nochg")
+
+
+
+def update():
+    print("Content-type: text/plain")
+    printNoCacheHeaders()
+    print("")
+
+    # first need to check for parameter issues
+    doUpdateIP = False
+    doUpdateTXT = False
+    doDelete = False
+
+    actionCount = 0
+    action = ""
+    if ("txt" in formFields):
+        doUpdateTXT = True
+        actionCount += 1
+    
+    if ("delete" in formFields):
+        doDelete = True
+        actionCount += 1
+
+    if ((actionCount == 0) or ("myip" in formFields)):
+        doUpdateIP = True
+        actionCount += 1
+
+    if (actionCount > 1):
+        print("badparam")
+        return
+
+    username = getAuthorizedUser()
+    hostnameList = getHostnameList()
+    ipList = getIpList()
+    txtParam = getTxtParam()
+    deleteTypes = getDeleteParam()
+
+    if (len(hostnameList) == 0):
+        print("notfqdn")
+        return
+
+    if (len(hostnameList) > 20):
+        print("numhost")
+        return
+
+    if (len(ipList) > 20):
+        print("numip")
+        return
+
+    allowedPatterns = getFQDNPatterns(username)
+    for hostname in hostnameList:
+        print(hostname)
+        # check hostname (notfqdn)
+        if (not isValidFQDN(hostname)):
+            print("notfqdn")
+        # check hostname authorization (nohost,abuse)
+        else:
+            zone = getFQDNZone(hostname,allowedPatterns)
+            if (zone is None):
+                print("nohost")
+            else:
+                zoneInfo = getZoneInfo(zone)
+                # print("good")
+                # print(zoneInfo)
+                if (doUpdateIP):
+                    # set ips
+                    updateIPs(hostname, ipList, zoneInfo)
+                elif (doUpdateTXT):
+                    # set txt
+                    updateTXT(hostname, txtParam, zoneInfo)
+                elif (doDelete):
+                    # do delete
+                    delete(hostname, deleteTypes, zoneInfo)
+
+    
+
+
+def print_variable(name, value):
+    print(f'<li><strong>{name}:</strong> {value}</li>')
+
+def debugHTML():
+    print("Content-type: text/html")
+    printNoCacheHeaders()
+    print("")
+
+    print("<html><head><title>Server Variables and CGI Parameters</title></head><body>")
+    print("<h1>Server Variables and CGI Parameters</h1>")
+    print("<ul>")
+    
+    # Server Variables
+    print("<h2>Server Variables</h2>")
+    for key, value in os.environ.items():
+        print_variable(key, value)
+    
+    # CGI Parameters
+    print("<h2>CGI Parameters</h2>")
+    for key in formFields:
+        print_variable(key, formFields[key])
+        
+    print("</ul>")
+
+    if ("myip" in formFields):
+        for ip in getIpList():
+            print(ip)
+            if (isValidIPv4Address(ip)):
+                print("IPv4")
+            elif (isValidIPv6Address(ip)):
+                print("IPv6")
+            else:
+                print("not IP")
+            print("<br>")
+
+    print("</body></html>")
+
+
+def main():
+    SCRIPT_NAME = ""
+    if ("SCRIPT_NAME" in os.environ):
+        SCRIPT_NAME = os.environ["SCRIPT_NAME"]
+
+    if (SCRIPT_NAME == "/checkip"):
+        checkip()
+    elif (SCRIPT_NAME == "/checkparams"):
+        checkParams()
+    elif (SCRIPT_NAME == "/update"):
+        update()
+    elif (SCRIPT_NAME == "/err"):
+        print("you should never see this")
+    else:
+        debugHTML()
+
+if __name__ == "__main__":
+    try:
+        main()
+
+    # this needs to be removed before productionalizing 
+    except Exception as e:
+        if debug:
+            # Print the exception information to stdout
+            print("An exception occurred:")
+            print(f"Type: {type(e).__name__}")
+            print(f"Message: {str(e)}")
+            print("Traceback (most recent call last):")
+            traceback = sys.exc_info()[2]
+            for frame in traceback.tb_next:
+                print(f'  File "{frame.tb_frame.f_code.co_filename}", line {frame.tb_lineno}, in {frame.tb_frame.f_code.co_name}')
+                print(f'    {frame.tb_frame.f_code.co_name}({", ".join(repr(arg) for arg in frame.tb_frame.f_code.co_varnames)})')
+            print(f"{type(e).__name__}: {str(e)}")
+        else:
+            problemStop()
+
