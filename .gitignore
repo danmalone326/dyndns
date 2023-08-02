@@ -1,3 +1,6 @@
-# ignore the secure directory except for the template files
+# ignore the some directories except for the template files
 secure/*
 !secure/*.template
+
+data/*
+!data/*.template
