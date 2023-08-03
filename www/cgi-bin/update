@@ -1,18 +1,19 @@
 #!/usr/bin/python3
 import sys
 import os
-# import cgi
 from urllib.parse import parse_qsl, parse_qs
 import re
-# import json
 import csv 
+import yaml
 
 # sudo pip3 install dnspython
 import dns.resolver
+import dns.tsigkeyring
+import dns.update
 import dns
 
 # enable debugging features
-debug = True
+debug = False
 
 # we get this from the apache config
 ddBaseDir = os.environ.get("DD_BASE_DIR", ".")
@@ -219,6 +220,14 @@ def getCurrentDNS(hostname,recordType,nameServerIP):
     
     return result
 
+def getTsigKey(zoneInfo):
+    try:
+        with open(zoneInfo["keyFile"], 'r') as f:
+            data = yaml.load(f)["key"][0]
+    except:
+        problemStop("getTsigKey")
+    return data
+
 def printNoCacheHeaders():
     print("Cache-Control: no-cache, no-store, max-age=0, must-revalidate")
     print("Expires: Mon, 01 Jan 1990 00:00:00 GMT")
@@ -255,25 +264,42 @@ def updateIPs(hostname, ipList, zoneInfo):
 
     currentUnique = set(currentIPs)
     newUnique = set(ipList)
+    
+    tsigKey = getTsigKey(zoneInfo)
+    if debug:
+        print(tsigKey)
 
     defaultTTL = "30"
     # if there are any differences, we will always do the same
     if (newUnique.symmetric_difference(currentUnique)):
-        update = []
-        update.append(f'server {zoneInfo["nameServerIP"]}')
-        update.append(f'zone {zoneInfo["name"]}')
-        update.append(f'del {hostname} A')
-        update.append(f'del {hostname} AAAA')
+        hostnameObj = dns.name.from_text(hostname)
+        zoneNameObj = dns.name.from_text(zoneInfo["name"])
+
+        keyring = dns.tsigkeyring.from_text({tsigKey["id"]: tsigKey["secret"]})
+        keyring["algorithm"] = tsigKey["algorithm"].lower()
+        update = dns.update.Update(zoneNameObj, keyring=keyring)
+
+        update.delete(hostnameObj, 'A')
+        update.delete(hostnameObj, 'AAAA')
+
         for ip in newUnique:
             if (isValidIPv4Address(ip)):
                 rType = "A"
             else:
                 rType = "AAAA"
-            update.append(f'add {hostname} {defaultTTL} {rType} {ip}')
-        update.append(f'send')
-        update.append(f'quit')
-        print("\n".join(update))
-        print("good " + ','.join(newUnique))
+            update.add(hostnameObj, defaultTTL, rType, ip)
+
+        try: 
+            response = dns.query.tcp(update, zoneInfo["nameServerIP"])
+            if (response.rcode() == dns.rcode.NOERROR):
+                print("good " + ','.join(newUnique))
+            else:
+                stopMessage("dnserr")
+        except:
+            if debug:
+                print("except")
+            stopMessage("dnserr")
+
     else:
         # no update needed
         print("nochg " + ','.join(currentIPs))
