@@ -4,7 +4,8 @@ import os
 # import cgi
 from urllib.parse import parse_qsl, parse_qs
 import re
-import json
+# import json
+import csv 
 
 # sudo pip3 install dnspython
 import dns.resolver
@@ -13,8 +14,11 @@ import dns
 # enable debugging features
 debug = True
 
-authorizedHostsFilename = "data/authorizedHosts.json"
-zoneInfoFilename = "data/zoneInfo.json"
+# we get this from the apache config
+ddBaseDir = os.environ.get("DD_BASE_DIR", ".")
+
+authorizedHostsFilename = f"{ddBaseDir}/data/authorizedHosts.csv"
+zoneInfoFilename = f"{ddBaseDir}/data/zoneInfo.csv"
 
 # make global
 # formFields = cgi.FieldStorage()
@@ -22,81 +26,19 @@ zoneInfoFilename = "data/zoneInfo.json"
 # changed from parse_qsl to parse_qs to handle multiple txt values
 formFields = dict(parse_qs(os.environ.get("QUERY_STRING", "")))
 
-# returns true if the string is an IPv4 Address (original from chatGPT)
+# returns true if the string is an IPv4 Address
 def isValidIPv4Address(str):
     try:
         dns.ipv4.inet_aton(str)
         return True
-    except Exception:
+    except:
         return False
-        # try:
-        #     dns.ipv6.inet_aton(text, True)
-        #     return AF_INET6
-        # except Exception:
-        #     raise ValueError
 
-    # try:
-    #     # Split the address into its individual octets
-    #     octets = str.split('.')
-
-    #     # Ensure that there are exactly 4 octets
-    #     if len(octets) != 4:
-    #         return False
-
-    #     # Convert each octet to an integer and check if it's within the valid range
-    #     for octet in octets:
-    #         try:
-    #             # Check for leading zeros
-    #             if ((len(octet) > 1) and (octet[0] == "0")):
-    #                 return False
-                
-    #             value = int(octet)
-    #             if ((value < 0) or (value > 255)):
-    #                 return False
-                
-    #             # Check if the octet contains only ASCII digits (0-9)
-    #             if (not re.match(r'^[0-9]+$', octet)):
-    #                 return False
-
-    #         except ValueError:
-    #             return False
-
-    #     return True
-
-    # except:
-    #     return False
-
-# returns true if the string is an IPv6 Address (original from chatGPT)
+# returns true if the string is an IPv6 Address
 def isValidIPv6Address(str):
     try:
-        # Split the address into its individual parts
-        parts = str.split(':')
-
-        # Ensure that there are no more than 8 parts
-        if (len(parts) > 8):
-            return False
-        # print("here: " + str)
-
-        # Count the number of compressed parts "::" and check if they are at most 1
-        compressedParts = str.count('::')
-        if (compressedParts > 1):
-            return False
-        
-        # if no compression, then we need exactly 8 parts
-        if ((compressedParts == 0) and (len(parts) != 8)):
-            return False
-        
-        # can not start or end with a single colon
-        if (((str[0] == ":") and (str[1] != ":")) or ((str[-1] == ":") and (str[-2] != ":"))):
-            return False
-
-        # Check if each part is a valid hexadecimal value (0-9, A-F, a-f)
-        for part in parts:
-            if (not re.match(r'^[0-9A-Fa-f]{0,4}$', part)):
-                return False
-
+        dns.ipv6.inet_aton(str, True)
         return True
-
     except:
         return False
     
@@ -130,7 +72,7 @@ def isValidFQDN(str):
 def getIpList():
     result = []
 
-    # first we'll get all the options
+    # first we'll get all the possible options
     myipAll = formFields.get("myip",[])
     xForwardedFor = os.environ.get("HTTP_X_FORWARDED_FOR",None)
     if (xForwardedFor):
@@ -213,43 +155,47 @@ def getFQDNPatterns(username):
     result = []
     try:
         with open(authorizedHostsFilename, 'r') as f:
-            data = json.load(f)
+            data = csv.reader(f)
 
-            for entry in data:
-                if (entry["username"] == username):
-                    for pattern in entry["patterns"]:
+            for row in data:
+                if (len(row) == 3):
+                    authorizedUser,pattern,zone = row
+                    if (authorizedUser == username):
                         rePattern = ("^" + pattern + "$").replace('.','\\.').replace('*','.*')
-                        thisPattern = { "regex": rePattern, "zone": entry["zone"] }
+                        thisPattern = { "regex": rePattern, "zoneName": zone }
                         result.append(thisPattern)
         
         return result
 
     except:
-        problemStop()
+        problemStop("getFQDNPatterns")
     
 def getZoneInfo(zone):
     try:
         with open(zoneInfoFilename, 'r') as f:
-            data = json.load(f)
+            data = csv.reader(f)
 
-            for entry in data:
-                if (entry["name"] == zone):
-                    return entry
+            for row in data:
+                if (len(row) == 3):
+                    name,nameServerIP,keyFile = row
+                    if (name == zone):
+                        thisZone = { "name": name, "nameServerIP": nameServerIP, "keyFile": keyFile}
+                        return thisZone
 
-        problemStop()     
+        problemStop("getZoneInfo 1")     
 
     except:
-        problemStop()
+        problemStop("getZoneInfo 2")
     
 def getFQDNZone(hostname,allowedPatterns):
     for pattern in allowedPatterns:
         if (re.match(pattern["regex"],hostname)):
-            return pattern["zone"]
+            return pattern["zoneName"]
     return None
 
 def isAuthorizedFQDN(hostname,allowedPatterns):
-    zone = getFQDNZone(hostname,allowedPatterns)
-    if (zone is not None):
+    zoneName = getFQDNZone(hostname,allowedPatterns)
+    if (zoneName is not None):
         return True
     else:
         return False
@@ -282,8 +228,11 @@ def stopMessage(str):
     print(str)
     sys.exit(0)
 
-def problemStop():
-    stopMessage("911")
+def problemStop(str):
+    result = "911"
+    if debug:
+        result += f" {str}"
+    stopMessage(result)
 
 def dnserrStop():
     stopMessage("dnserr")
@@ -296,40 +245,13 @@ def checkip():
     for ip in getIpList():
         print(ip)
 
-def checkParams():
-    print("Content-type: text/plain")
-    printNoCacheHeaders()
-    print("")
-
-    print("Hostnames:")
-    hostnameList = getHostnameList()
-    for hostname in hostnameList:
-        print(hostname)
-
-    print("")
-    print("Valid IPs:")
-    ipList = getIpList()
-    for ip in ipList:
-        print(ip)
-
-    print("")
-    print("TXT:")
-    txtParam = getTxtParam()
-    print(txtParam)
-
-    print("")
-    print("Delete:")
-    deleteParam = getDeleteParam()
-    print(deleteParam)
-
-    print("")
-
 def updateIPs(hostname, ipList, zoneInfo):
     currentIPs = getCurrentDNS(hostname,"A",zoneInfo["nameServerIP"])
     currentIPs.extend(getCurrentDNS(hostname,"AAAA",zoneInfo["nameServerIP"]))
 
-    print(currentIPs)
-    print(ipList)
+    if debug:
+        print(currentIPs)
+        print(ipList)
 
     currentUnique = set(currentIPs)
     newUnique = set(ipList)
@@ -360,8 +282,9 @@ def updateTXT(hostname, newTXTs, zoneInfo):
     # update to support multiple txt records
     currentTXTs = getCurrentDNS(hostname,"TXT",zoneInfo["nameServerIP"])
 
-    print(currentTXTs)
-    print(newTXTs)
+    if debug:
+        print(currentTXTs)
+        print(newTXTs)
 
     currentUnique = set(currentTXTs)
     newUnique = set(newTXTs)
@@ -433,8 +356,7 @@ def update():
         actionCount += 1
 
     if (actionCount > 1):
-        print("badparam")
-        return
+        stopMessage("badparam")
 
     username = getAuthorizedUser()
     hostnameList = getHostnameList()
@@ -443,30 +365,28 @@ def update():
     deleteTypes = getDeleteParam()
 
     if (len(hostnameList) == 0):
-        print("notfqdn")
-        return
+        stopMessage("notfqdn")
 
     if (len(hostnameList) > 20):
-        print("numhost")
-        return
+        stopMessage("numhost")
 
     if (len(ipList) > 20):
-        print("numip")
-        return
+        stopMessage("numip")
 
     allowedPatterns = getFQDNPatterns(username)
     for hostname in hostnameList:
-        print(hostname)
+        if debug:
+            print(hostname)
         # check hostname (notfqdn)
         if (not isValidFQDN(hostname)):
             print("notfqdn")
         # check hostname authorization (nohost,abuse)
         else:
-            zone = getFQDNZone(hostname,allowedPatterns)
-            if (zone is None):
+            zoneName = getFQDNZone(hostname,allowedPatterns)
+            if (zoneName is None):
                 print("nohost")
             else:
-                zoneInfo = getZoneInfo(zone)
+                zoneInfo = getZoneInfo(zoneName)
                 # print("good")
                 # print(zoneInfo)
                 if (doUpdateIP):
@@ -482,6 +402,34 @@ def update():
     
 
 
+def checkParams():
+    print("Content-type: text/plain")
+    printNoCacheHeaders()
+    print("")
+
+    print("Hostnames:")
+    hostnameList = getHostnameList()
+    for hostname in hostnameList:
+        print(hostname)
+
+    print("")
+    print("Valid IPs:")
+    ipList = getIpList()
+    for ip in ipList:
+        print(ip)
+
+    print("")
+    print("TXT:")
+    txtParam = getTxtParam()
+    print(txtParam)
+
+    print("")
+    print("Delete:")
+    deleteParam = getDeleteParam()
+    print(deleteParam)
+
+    print("")
+
 def print_variable(name, value):
     print(f'<li><strong>{name}:</strong> {value}</li>')
 
@@ -490,7 +438,10 @@ def debugHTML():
     printNoCacheHeaders()
     print("")
 
-    print("<html><head><title>Server Variables and CGI Parameters</title></head><body>")
+    print("<html><head>")
+    print("<title>Server Variables and CGI Parameters</title>")
+    print("<link rel='icon' href='data:,'>")
+    print("</head><body>")
     print("<h1>Server Variables and CGI Parameters</h1>")
     print("<ul>")
     
@@ -527,14 +478,18 @@ def main():
 
     if (SCRIPT_NAME == "/checkip"):
         checkip()
-    elif (SCRIPT_NAME == "/checkparams"):
-        checkParams()
     elif (SCRIPT_NAME == "/update"):
         update()
-    elif (SCRIPT_NAME == "/err"):
-        print("you should never see this")
     else:
-        debugHTML()
+        if debug:
+            if (SCRIPT_NAME == "/checkparams"):
+                checkParams()
+            elif (SCRIPT_NAME == "/err"):
+                print("you should never see this")
+            else:
+                debugHTML()
+        else:
+            stopMessage("badop")
 
 if __name__ == "__main__":
     try:

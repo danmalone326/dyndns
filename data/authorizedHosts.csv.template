@@ -1,0 +1,4 @@
+authorizedUser,pattern,zoneName
+johndoe,site1.example.com,example.com
+johndoe,site2.example.com,example.com
+janedoe,*.example.org,example.org
