@@ -46,14 +46,14 @@ def isValidIPv6Address(str):
 def isValidIPAddress(str):
     return isValidIPv4Address(str) or isValidIPv6Address(str)
 
-    
-def isValidFQDN(str):
+# returns true if the string is a valid hostname
+def isValidHostname(str):
     try:
-        # Check if the length of the FQDN is within the valid limit
+        # Check if the length of the hostname is within the valid limit
         if (len(str) > 255):
             return False
 
-        # Split the FQDN into individual labels
+        # Split the hostname into individual labels
         labels = str.split('.')
 
         # Check each label for length and validity
@@ -154,7 +154,7 @@ def getDeleteParam():
 def getAuthorizedUser():
     return os.environ.get("REMOTE_USER",None)
 
-def getFQDNPatterns(username):
+def getHostnamePatterns(username):
     result = []
     try:
         with open(authorizedHostsFilename, 'r') as f:
@@ -171,7 +171,7 @@ def getFQDNPatterns(username):
         return result
 
     except:
-        problemStop("getFQDNPatterns")
+        problemStop("getHostnamePatterns")
     
 def getZoneInfo(zone):
     try:
@@ -190,14 +190,14 @@ def getZoneInfo(zone):
     except:
         problemStop("getZoneInfo 2")
     
-def getFQDNZone(hostname,allowedPatterns):
+def getHostnameZone(hostname,allowedPatterns):
     for pattern in allowedPatterns:
         if (re.match(pattern["regex"],hostname)):
             return pattern["zoneName"]
     return None
 
-def isAuthorizedFQDN(hostname,allowedPatterns):
-    zoneName = getFQDNZone(hostname,allowedPatterns)
+def isAuthorizedHostname(hostname,allowedPatterns):
+    zoneName = getHostnameZone(hostname,allowedPatterns)
     if (zoneName is not None):
         return True
     else:
@@ -436,16 +436,16 @@ def update():
     if (len(ipList) > 20):
         stopMessage("numip")
 
-    allowedPatterns = getFQDNPatterns(username)
+    allowedPatterns = getHostnamePatterns(username)
     for hostname in hostnameList:
         if debug:
             print(hostname)
         # check hostname (notfqdn)
-        if (not isValidFQDN(hostname)):
+        if (not isValidHostname(hostname)):
             print("notfqdn")
         # check hostname authorization (nohost,abuse)
         else:
-            zoneName = getFQDNZone(hostname,allowedPatterns)
+            zoneName = getHostnameZone(hostname,allowedPatterns)
             if (zoneName is None):
                 print("nohost")
             else:
