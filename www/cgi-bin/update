@@ -611,9 +611,13 @@ def main():
     if ("SCRIPT_NAME" in os.environ):
         SCRIPT_NAME = os.environ["SCRIPT_NAME"]
 
+    # checkip endpoint
     if (SCRIPT_NAME == "/checkip"):
         checkip()
-    elif (SCRIPT_NAME == "/update"):
+    
+    # dyndns legacy and v3 protocol endpoints (extended)
+    elif (SCRIPT_NAME in ["/nic/update",
+                          "/v3/update"]):
         update()
     else:
         if debug:
