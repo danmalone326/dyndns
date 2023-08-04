@@ -1,3 +1,3 @@
-name,nameServerIP,keyFile
-example.com,172.168.25.254,keyFile1
-example.org,172.168.25.254,keyFile2
+name,nameServerIP,nameServerPort,keyFile
+example.com,172.168.25.254,53,keyFile1
+example.org,172.168.25.254,53,keyFile2
