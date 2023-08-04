@@ -204,6 +204,10 @@ def isAuthorizedFQDN(hostname,allowedPatterns):
 def getCurrentDNS(hostname,recordType,nameServerIP):
     resolver = dns.resolver.Resolver()
     resolver.nameservers = [nameServerIP]
+    resolver.no_recurse = True
+
+    if debug:
+        print(resolver.nameservers)
 
     result = []
     try:
@@ -216,7 +220,7 @@ def getCurrentDNS(hostname,recordType,nameServerIP):
         # no results for this type
         pass
     except:
-        dnserrStop()
+        dnserrStop(sys.exc_info()[0])
     
     return result
 
@@ -243,7 +247,9 @@ def problemStop(str):
         result += f" {str}"
     stopMessage(result)
 
-def dnserrStop():
+def dnserrStop(str = None):
+    if (debug and (str is not None)):
+        print(str)
     stopMessage("dnserr")
 
 def checkip():
@@ -255,8 +261,9 @@ def checkip():
         print(ip)
 
 def updateIPs(hostname, ipList, zoneInfo):
-    currentIPs = getCurrentDNS(hostname,"A",zoneInfo["nameServerIP"])
-    currentIPs.extend(getCurrentDNS(hostname,"AAAA",zoneInfo["nameServerIP"]))
+    hostnameObj = dns.name.from_text(hostname)
+    currentIPs = getCurrentDNS(hostnameObj,"A",zoneInfo["nameServerIP"])
+    currentIPs.extend(getCurrentDNS(hostnameObj,"AAAA",zoneInfo["nameServerIP"]))
 
     if debug:
         print(currentIPs)
@@ -265,15 +272,14 @@ def updateIPs(hostname, ipList, zoneInfo):
     currentUnique = set(currentIPs)
     newUnique = set(ipList)
     
-    tsigKey = getTsigKey(zoneInfo)
-    if debug:
-        print(tsigKey)
-
     defaultTTL = "30"
     # if there are any differences, we will always do the same
     if (newUnique.symmetric_difference(currentUnique)):
-        hostnameObj = dns.name.from_text(hostname)
         zoneNameObj = dns.name.from_text(zoneInfo["name"])
+
+        tsigKey = getTsigKey(zoneInfo)
+        if debug:
+            print(tsigKey)
 
         keyring = dns.tsigkeyring.from_text({tsigKey["id"]: tsigKey["secret"]})
         keyring["algorithm"] = tsigKey["algorithm"].lower()
@@ -294,19 +300,19 @@ def updateIPs(hostname, ipList, zoneInfo):
             if (response.rcode() == dns.rcode.NOERROR):
                 print("good " + ','.join(newUnique))
             else:
-                stopMessage("dnserr")
+                dnserrStop()
         except:
             if debug:
                 print("except")
-            stopMessage("dnserr")
+            dnserrStop()
 
     else:
         # no update needed
         print("nochg " + ','.join(currentIPs))
 
 def updateTXT(hostname, newTXTs, zoneInfo):
-    # update to support multiple txt records
-    currentTXTs = getCurrentDNS(hostname,"TXT",zoneInfo["nameServerIP"])
+    hostnameObj = dns.name.from_text(hostname)
+    currentTXTs = getCurrentDNS(hostnameObj,"TXT",zoneInfo["nameServerIP"])
 
     if debug:
         print(currentTXTs)
@@ -318,39 +324,68 @@ def updateTXT(hostname, newTXTs, zoneInfo):
     defaultTTL = "0"
     # if there are any differences, we will always do the same
     if (newUnique.symmetric_difference(currentUnique)):
-        update = []
-        update.append(f'server {zoneInfo["nameServerIP"]}')
-        update.append(f'zone {zoneInfo["name"]}')
-        update.append(f'del {hostname} TXT')
-        for ip in newUnique:
-            rType = "TXT"
-            update.append(f'add {hostname} {defaultTTL} {rType} {ip}')
-        update.append(f'send')
-        update.append(f'quit')
-        print("\n".join(update))
-        print("good " + ','.join(newUnique))
+        zoneNameObj = dns.name.from_text(zoneInfo["name"])
+
+        tsigKey = getTsigKey(zoneInfo)
+        if debug:
+            print(tsigKey)
+
+        keyring = dns.tsigkeyring.from_text({tsigKey["id"]: tsigKey["secret"]})
+        keyring["algorithm"] = tsigKey["algorithm"].lower()
+        update = dns.update.Update(zoneNameObj, keyring=keyring)
+
+        rType = "TXT"
+        update.delete(hostnameObj, rType)
+        for txt in newUnique:
+            update.add(hostnameObj, defaultTTL, rType, txt)
+
+        try: 
+            response = dns.query.tcp(update, zoneInfo["nameServerIP"])
+            if (response.rcode() == dns.rcode.NOERROR):
+                print("good " + ','.join(newUnique))
+            else:
+                dnserrStop()
+        except:
+            if debug:
+                print("except")
+            dnserrStop()       
+
     else:
         # no update needed
         print("nochg " + ','.join(currentTXTs))
 
 def delete(hostname, deleteTypes, zoneInfo):
+    hostnameObj = dns.name.from_text(hostname)
     deletesNeeded = False
     for type in deleteTypes:
-        if (len(getCurrentDNS(hostname,type,zoneInfo["nameServerIP"])) > 0):
+        if (len(getCurrentDNS(hostnameObj,type,zoneInfo["nameServerIP"])) > 0):
             deletesNeeded = True
             break
     
     # if deletes are needed
     if (deletesNeeded):
-        update = []
-        update.append(f'server {zoneInfo["nameServerIP"]}')
-        update.append(f'zone {zoneInfo["name"]}')
-        for type in deleteTypes: 
-            update.append(f'del {hostname} {type}')
-        update.append(f'send')
-        update.append(f'quit')
-        print("\n".join(update))
-        print("good")
+        zoneNameObj = dns.name.from_text(zoneInfo["name"])
+
+        tsigKey = getTsigKey(zoneInfo)
+        if debug:
+            print(tsigKey)
+
+        keyring = dns.tsigkeyring.from_text({tsigKey["id"]: tsigKey["secret"]})
+        keyring["algorithm"] = tsigKey["algorithm"].lower()
+        update = dns.update.Update(zoneNameObj, keyring=keyring)
+
+        for rType in deleteTypes: 
+            update.delete(hostnameObj, rType)
+        try: 
+            response = dns.query.tcp(update, zoneInfo["nameServerIP"])
+            if (response.rcode() == dns.rcode.NOERROR):
+                print("good")
+            else:
+                dnserrStop()
+        except:
+            if debug:
+                print("except")
+            dnserrStop()        
     else:
         # no update needed
         print("nochg")
