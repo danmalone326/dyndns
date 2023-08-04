@@ -130,8 +130,10 @@ def getHostnameList():
     return result
 
 def getTxtParam():
-    # get all the options
-    result = formFields.get("txt",[])
+    # get all the txt parameters and enclose each one in double quotes
+    # the update would do this automatically, but we need to compare the results
+    # quotes make this complicated
+    result = ['"' + str + '"' for str in formFields.get("txt",[])]
     return result
     
 allowedDeleteValues = ["A","AAAA","TXT"]
