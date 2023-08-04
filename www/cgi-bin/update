@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import sys
 import os
-from urllib.parse import parse_qsl, parse_qs
+from urllib.parse import parse_qs
 import re
 import csv 
 import yaml
@@ -17,9 +17,11 @@ debug = False
 
 # we get this from the apache config
 ddBaseDir = os.environ.get("DD_BASE_DIR", ".")
+dataDir = f"{ddBaseDir}/data"
+secureDir = f"{ddBaseDir}/secure"
 
-authorizedHostsFilename = f"{ddBaseDir}/data/authorizedHosts.csv"
-zoneInfoFilename = f"{ddBaseDir}/data/zoneInfo.csv"
+authorizedHostsFilename = f"{dataDir}/authorizedHosts.csv"
+zoneInfoFilename = f"{dataDir}/zoneInfo.csv"
 
 # make global
 # formFields = cgi.FieldStorage()
@@ -69,30 +71,38 @@ def isValidHostname(str):
 
     except:
         return False
-    
+
+# gets the "best available" IP address(es) from form fields and variables from the server
 def getIpList():
     result = []
 
     # first we'll get all the possible options
     myipAll = formFields.get("myip",[])
+
+    # X-Forwarded-For can have multiple values if multiple proxy servers are traversed.
+    # The last one is the one we want
     xForwardedFor = os.environ.get("HTTP_X_FORWARDED_FOR",None)
     if (xForwardedFor):
         xForwardedFor = xForwardedFor.split()[-1]
+    
+    # There are mixed views on if this is X-Client-IP or Client-IP
     xClientIP = os.environ.get("HTTP_X_CLIENT_IP",None)
     clientIP = os.environ.get("HTTP_CLIENT_IP",None)
+    
     remoteAddr = os.environ.get("REMOTE_ADDR",None)
 
-    # print(myip)
-    # print(xForwardedFor)
-    # print(xClientIP)
-    # print(clientIP)
-    # print(remoteAddr)
+    if debug:
+        print(myipAll)
+        print(xForwardedFor)
+        print(xClientIP)
+        print(clientIP)
+        print(remoteAddr)
 
     # now we'll pick the first valid one
     result = []
     
     # special case for myip parameter because we allow multiple ips
-    # print("myip")
+    # there can be multiple parameters, each one can be a comma seperated list
     myipList = []
     if (len(myipAll) > 0):
         for myipOne in myipAll:
@@ -117,10 +127,11 @@ def getIpList():
 
     return result
 
+# get a list of hostnames from parameters
 def getHostnameList():
     result = []
 
-    # first we'll get all the options
+    # there can be multiple parameters, each one can be a comma seperated list
     hostnameAll = formFields.get("hostname",[])
     if (len(hostnameAll) > 0):
         for hostnameOne in hostnameAll:
@@ -129,6 +140,7 @@ def getHostnameList():
 
     return result
 
+# get a list of txt values from parameters
 def getTxtParam():
     # get all the txt parameters and enclose each one in double quotes
     # the update would do this automatically, but we need to compare the results
@@ -137,8 +149,14 @@ def getTxtParam():
     return result
     
 allowedDeleteValues = ["A","AAAA","TXT"]
+
+# get a list of types to be deleted from parameters
+# only a fixed set of values is allowed, plus "ALL"
+# if "ALL" is included, then all values will be used
 def getDeleteParam():
     result = []
+
+    # there can be multiple parameters, each one can be a comma seperated list
     deleteAll = formFields.get("delete",[])
     if (len(deleteAll) > 0):
         for deleteOne in deleteAll:
@@ -151,9 +169,11 @@ def getDeleteParam():
 
     return result
 
+# return the logged in user
 def getAuthorizedUser():
     return os.environ.get("REMOTE_USER",None)
 
+# read the hostname patterns that are authorized for this user
 def getHostnamePatterns(username):
     result = []
     try:
@@ -164,6 +184,7 @@ def getHostnamePatterns(username):
                 if (len(row) == 3):
                     authorizedUser,pattern,zone = row
                     if (authorizedUser == username):
+                        # we convert the simple pattern to a regex to be used later
                         rePattern = ("^" + pattern + "$").replace('.','\\.').replace('*','.*')
                         thisPattern = { "regex": rePattern, "zoneName": zone }
                         result.append(thisPattern)
@@ -172,30 +193,34 @@ def getHostnamePatterns(username):
 
     except:
         problemStop("getHostnamePatterns")
-    
+
+# finds the given zone in the csv file
 def getZoneInfo(zone):
     try:
         with open(zoneInfoFilename, 'r') as f:
             data = csv.reader(f)
 
             for row in data:
-                if (len(row) == 3):
-                    name,nameServerIP,keyFile = row
+                if (len(row) == 4):
+                    name,nameServerIP,nameServerPort,keyFile = row
                     if (name == zone):
-                        thisZone = { "name": name, "nameServerIP": nameServerIP, "keyFile": keyFile}
+                        thisZone = { "name": name, "nameServerIP": nameServerIP, "nameServerPort": int(nameServerPort), "keyFile": keyFile}
                         return thisZone
 
         problemStop("getZoneInfo 1")     
 
     except:
         problemStop("getZoneInfo 2")
-    
+
+# scans the allowed patterns and returns the zone name for the first one
+# that matches the given hostname
 def getHostnameZone(hostname,allowedPatterns):
     for pattern in allowedPatterns:
         if (re.match(pattern["regex"],hostname)):
             return pattern["zoneName"]
     return None
 
+# returns true if any pattern matches the given hostname
 def isAuthorizedHostname(hostname,allowedPatterns):
     zoneName = getHostnameZone(hostname,allowedPatterns)
     if (zoneName is not None):
@@ -203,17 +228,21 @@ def isAuthorizedHostname(hostname,allowedPatterns):
     else:
         return False
 
-def getCurrentDNS(hostname,recordType,nameServerIP):
+# simple dns lookup that returns the list of values
+def getCurrentDNS(hostname,recordType,nameServerIP,nameServerPort):
     resolver = dns.resolver.Resolver()
     resolver.nameservers = [nameServerIP]
+    resolver.port = nameServerPort
     resolver.no_recurse = True
 
     if debug:
         print(resolver.nameservers)
+        print(resolver.port)
 
     result = []
     try:
         answers = resolver.query(hostname, rdtype=recordType)
+        # put the values for each of the answers into the list
         result.extend(str(answer) for answer in answers)
     except dns.resolver.NXDOMAIN:
         # name does not exist
@@ -226,34 +255,42 @@ def getCurrentDNS(hostname,recordType,nameServerIP):
     
     return result
 
+# gets the secure key information for a given zone
 def getTsigKey(zoneInfo):
     try:
-        with open(zoneInfo["keyFile"], 'r') as f:
+        keyPath = f'{secureDir}/{zoneInfo["keyFile"]}'
+        with open(keyPath, 'r') as f:
             data = yaml.load(f)["key"][0]
     except:
         problemStop("getTsigKey")
     return data
 
+# server headers that will (attempt to) prevent a browser from caching results
 def printNoCacheHeaders():
     print("Cache-Control: no-cache, no-store, max-age=0, must-revalidate")
     print("Expires: Mon, 01 Jan 1990 00:00:00 GMT")
     print("Pragma: no-cache")
 
+# print a message and stop
 def stopMessage(str):
     print(str)
     sys.exit(0)
 
-def problemStop(str):
+# print 911 message with extra message if in debug mode
+def problemStop(str = None):
     result = "911"
-    if debug:
+    if (debug and (str is not None)):
         result += f" {str}"
     stopMessage(result)
 
+# print the dnserr message with extra message if in debug mode
 def dnserrStop(str = None):
+    result = "dnserr"
     if (debug and (str is not None)):
-        print(str)
-    stopMessage("dnserr")
+        result += f" {str}"
+    stopMessage(result)
 
+# the main checkip function returns a text list of the "best available" IP address(es)
 def checkip():
     print("Content-type: text/plain")
     printNoCacheHeaders()
@@ -262,68 +299,78 @@ def checkip():
     for ip in getIpList():
         print(ip)
 
+# this procedure performs the update for IP addresses if needed
 def updateIPs(hostname, ipList, zoneInfo):
+    # dns functions need this hostname object to operate the way we need them to
     hostnameObj = dns.name.from_text(hostname)
-    currentIPs = getCurrentDNS(hostnameObj,"A",zoneInfo["nameServerIP"])
-    currentIPs.extend(getCurrentDNS(hostnameObj,"AAAA",zoneInfo["nameServerIP"]))
+
+    # get the current values from dns for comparison
+    currentIPs = getCurrentDNS(hostnameObj,"A",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"])
+    currentIPs.extend(getCurrentDNS(hostnameObj,"AAAA",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"]))
 
     if debug:
         print(currentIPs)
         print(ipList)
 
+    # convert current and requested to sets for easier comparison
     currentUnique = set(currentIPs)
-    newUnique = set(ipList)
+    requestedUnique = set(ipList)
     
-    defaultTTL = "30"
     # if there are any differences, we will always do the same
-    if (newUnique.symmetric_difference(currentUnique)):
+    if (requestedUnique.symmetric_difference(currentUnique)):
         zoneNameObj = dns.name.from_text(zoneInfo["name"])
 
         tsigKey = getTsigKey(zoneInfo)
         if debug:
             print(tsigKey)
 
+        # create the update object with the secret key
         keyring = dns.tsigkeyring.from_text({tsigKey["id"]: tsigKey["secret"]})
         keyring["algorithm"] = tsigKey["algorithm"].lower()
         update = dns.update.Update(zoneNameObj, keyring=keyring)
 
+        # first delete any current records
         update.delete(hostnameObj, 'A')
         update.delete(hostnameObj, 'AAAA')
 
-        for ip in newUnique:
+        # now add each requested IP address
+        defaultTTL = "30"
+        for ip in requestedUnique:
             if (isValidIPv4Address(ip)):
                 rType = "A"
             else:
                 rType = "AAAA"
             update.add(hostnameObj, defaultTTL, rType, ip)
 
+        # do the update with error and exception handling
         try: 
-            response = dns.query.tcp(update, zoneInfo["nameServerIP"])
+            response = dns.query.tcp(update, zoneInfo["nameServerIP"], port=zoneInfo["nameServerPort"])
             if (response.rcode() == dns.rcode.NOERROR):
-                print("good " + ','.join(newUnique))
+                print("good " + ','.join(requestedUnique))
             else:
-                dnserrStop()
+                dnserrStop("updateIPs")
         except:
-            if debug:
-                print("except")
-            dnserrStop()
+            dnserrStop("updateIPs except")
 
     else:
         # no update needed
         print("nochg " + ','.join(currentIPs))
 
+# this procedure performs the update for TXT records if needed
 def updateTXT(hostname, newTXTs, zoneInfo):
     hostnameObj = dns.name.from_text(hostname)
-    currentTXTs = getCurrentDNS(hostnameObj,"TXT",zoneInfo["nameServerIP"])
+
+    # get the current values from dns for comparison
+    currentTXTs = getCurrentDNS(hostnameObj,"TXT",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"])
 
     if debug:
         print(currentTXTs)
         print(newTXTs)
 
+    # convert current and requested to sets for easier comparison
     currentUnique = set(currentTXTs)
     newUnique = set(newTXTs)
 
-    defaultTTL = "0"
     # if there are any differences, we will always do the same
     if (newUnique.symmetric_difference(currentUnique)):
         zoneNameObj = dns.name.from_text(zoneInfo["name"])
@@ -332,25 +379,28 @@ def updateTXT(hostname, newTXTs, zoneInfo):
         if debug:
             print(tsigKey)
 
+        # create the update object with the secret key
         keyring = dns.tsigkeyring.from_text({tsigKey["id"]: tsigKey["secret"]})
         keyring["algorithm"] = tsigKey["algorithm"].lower()
         update = dns.update.Update(zoneNameObj, keyring=keyring)
 
+        defaultTTL = "0"
         rType = "TXT"
+        # first delete any current records
         update.delete(hostnameObj, rType)
+        # now add each requested TXT record
         for txt in newUnique:
             update.add(hostnameObj, defaultTTL, rType, txt)
 
+        # do the update with error and exception handling
         try: 
-            response = dns.query.tcp(update, zoneInfo["nameServerIP"])
+            response = dns.query.tcp(update, zoneInfo["nameServerIP"], port=zoneInfo["nameServerPort"])
             if (response.rcode() == dns.rcode.NOERROR):
                 print("good " + ','.join(newUnique))
             else:
-                dnserrStop()
+                dnserrStop("updateTXT")
         except:
-            if debug:
-                print("except")
-            dnserrStop()       
+            dnserrStop("updateTXT except")       
 
     else:
         # no update needed
@@ -358,9 +408,11 @@ def updateTXT(hostname, newTXTs, zoneInfo):
 
 def delete(hostname, deleteTypes, zoneInfo):
     hostnameObj = dns.name.from_text(hostname)
+
+    # see if there are any current values that need to be deleted
     deletesNeeded = False
     for type in deleteTypes:
-        if (len(getCurrentDNS(hostnameObj,type,zoneInfo["nameServerIP"])) > 0):
+        if (len(getCurrentDNS(hostnameObj,type,zoneInfo["nameServerIP"],zoneInfo["nameServerPort"])) > 0):
             deletesNeeded = True
             break
     
@@ -372,40 +424,42 @@ def delete(hostname, deleteTypes, zoneInfo):
         if debug:
             print(tsigKey)
 
+        # create the update object with the secret key
         keyring = dns.tsigkeyring.from_text({tsigKey["id"]: tsigKey["secret"]})
         keyring["algorithm"] = tsigKey["algorithm"].lower()
         update = dns.update.Update(zoneNameObj, keyring=keyring)
 
+        # add each type to be deleted
         for rType in deleteTypes: 
             update.delete(hostnameObj, rType)
+
+        # do the update with error and exception handling
         try: 
-            response = dns.query.tcp(update, zoneInfo["nameServerIP"])
+            response = dns.query.tcp(update, zoneInfo["nameServerIP"], port=zoneInfo["nameServerPort"])
             if (response.rcode() == dns.rcode.NOERROR):
                 print("good")
             else:
-                dnserrStop()
+                dnserrStop("delete")
         except:
-            if debug:
-                print("except")
-            dnserrStop()        
+            dnserrStop("delete except")        
     else:
         # no update needed
         print("nochg")
 
 
-
+# the main update function that validates the parameters and decides what update is being requested
 def update():
     print("Content-type: text/plain")
     printNoCacheHeaders()
     print("")
 
-    # first need to check for parameter issues
+    # first need to check for parameter combination issues
+    # set booleans for later, but also count parameters at the same time
     doUpdateIP = False
     doUpdateTXT = False
     doDelete = False
 
     actionCount = 0
-    action = ""
     if ("txt" in formFields):
         doUpdateTXT = True
         actionCount += 1
@@ -414,6 +468,7 @@ def update():
         doDelete = True
         actionCount += 1
 
+    # if none of the update parameters, then updating the IPs is the default action
     if ((actionCount == 0) or ("myip" in formFields)):
         doUpdateIP = True
         actionCount += 1
@@ -427,6 +482,7 @@ def update():
     txtParam = getTxtParam()
     deleteTypes = getDeleteParam()
 
+    # now checking specific parameter limits
     if (len(hostnameList) == 0):
         stopMessage("notfqdn")
 
@@ -436,22 +492,32 @@ def update():
     if (len(ipList) > 20):
         stopMessage("numip")
 
+    # get the allowed patters for the current user
     allowedPatterns = getHostnamePatterns(username)
+
+    # loop through each given hostname 
     for hostname in hostnameList:
         if debug:
             print(hostname)
+
         # check hostname (notfqdn)
         if (not isValidHostname(hostname)):
             print("notfqdn")
+
         # check hostname authorization (nohost,abuse)
         else:
             zoneName = getHostnameZone(hostname,allowedPatterns)
             if (zoneName is None):
                 print("nohost")
             else:
+                # now we are authorized to do an update
+
+                # get the zoneInfo for this zone
                 zoneInfo = getZoneInfo(zoneName)
-                # print("good")
-                # print(zoneInfo)
+                if debug:
+                    print(zoneInfo)
+
+                # now call the specific update function
                 if (doUpdateIP):
                     # set ips
                     updateIPs(hostname, ipList, zoneInfo)
@@ -462,9 +528,8 @@ def update():
                     # do delete
                     delete(hostname, deleteTypes, zoneInfo)
 
-    
 
-
+# (for debugging) display parameters
 def checkParams():
     print("Content-type: text/plain")
     printNoCacheHeaders()
@@ -493,9 +558,11 @@ def checkParams():
 
     print("")
 
+# (for debugging) 
 def print_variable(name, value):
     print(f'<li><strong>{name}:</strong> {value}</li>')
 
+# (for debugging) display parameters and server variables and more in nicer HTML
 def debugHTML():
     print("Content-type: text/html")
     printNoCacheHeaders()
@@ -533,7 +600,10 @@ def debugHTML():
 
     print("</body></html>")
 
-
+# this function will determine what is being asked. 
+# configured correctly, the web server will send ALL requests here, so we need to 
+# determine what paths we respond to and how
+# this is where we can add support for other ddns APIs
 def main():
     SCRIPT_NAME = ""
     if ("SCRIPT_NAME" in os.environ):
@@ -554,11 +624,13 @@ def main():
         else:
             stopMessage("badop")
 
+# the python main entrypoint 
 if __name__ == "__main__":
     try:
         main()
 
-    # this needs to be removed before productionalizing 
+    # this catches all exceptions that were not handled properly.
+    # display is only when in debug mode
     except Exception as e:
         if debug:
             # Print the exception information to stdout
