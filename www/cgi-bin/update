@@ -12,8 +12,10 @@ import dns.tsigkeyring
 import dns.update
 import dns
 
-# enable debugging features
+# enable debugging features always
 debug = False
+# enable debug parameter to selectively turn debugging
+debugParameterAllow = False
 
 # we get this from the apache config
 ddBaseDir = os.environ.get("DD_BASE_DIR", ".")
@@ -27,7 +29,7 @@ zoneInfoFilename = f"{dataDir}/zoneInfo.csv"
 # formFields = cgi.FieldStorage()
 # formFields = dict(parse_qsl(os.environ.get("QUERY_STRING", "")))
 # changed from parse_qsl to parse_qs to handle multiple txt values
-formFields = dict(parse_qs(os.environ.get("QUERY_STRING", "")))
+formFields = dict(parse_qs(os.environ.get("QUERY_STRING", ""),keep_blank_values=True))
 
 # returns true if the string is an IPv4 Address
 def isValidIPv4Address(str):
@@ -623,6 +625,10 @@ def main():
                 debugHTML()
         else:
             stopMessage("badop")
+
+# if requested, turn on debug parameter as soon as possible
+if ((debugParameterAllow) and ("debug" in formFields)):
+    debug = True
 
 # the python main entrypoint 
 if __name__ == "__main__":
