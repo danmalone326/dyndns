@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# call this script for both the auth-hook and the cleanup-hook
+# usage:  certbot-hook auth|cleanup
+usage()
+{
+  echo "Usage: $0 auth|cleanup"
+  exit 1
+}
+
+if [ $# -eq 0 ]; then
+  usage
+fi
+
+# Assumes these 2 come from certbot
+#echo $CERTBOT_DOMAIN
+#echo $CERTBOT_VALIDATION
+
+DYNDNS_URL="https://update.example.org/nic/update"
+DYNDNS_USERNAME="johndoe"
+DYNDNS_PASSWORD="UncleBuck"
+
+# if mapping to a different domain, modify this REGEX for the change
+#DDNS_REGEX="s/example.com$/ddns.example.com/"
+# this default one does nothing
+DDNS_REGEX="s/^$//"
+
+DDNS_DOMAIN=$(echo $CERTBOT_DOMAIN | sed -e "$DDNS_REGEX")
+#echo $DDNS_DOMAIN
+
+TXT_RECORD="_acme-challenge.${DDNS_DOMAIN}"
+#echo $TXT_DOMAIN
+
+if [[ $1 == "auth" ]]; then
+  QUERY_STRING="hostname=${TXT_RECORD}&txt=${CERTBOT_VALIDATION}"
+elif [[ $1 == "cleanup" ]]; then
+  QUERY_STRING="hostname=${TXT_RECORD}&delete=TXT"
+else
+  usage
+fi
+
+CURL_COMMAND="/usr/bin/curl -K- ${DYNDNS_URL}?${QUERY_STRING}"
+
+echo $CURL_COMMAND
+
+$CURL_COMMAND <<EOF
+-u $DYNDNS_USERNAME:$DYNDNS_PASSWORD
+EOF
+
+# wait for zone transfer
+sleep 5
