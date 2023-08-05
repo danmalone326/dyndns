@@ -128,15 +128,15 @@ There are 4 steps required to allow DNS updates.
 
 ### Creating a new user account
 A user account will be granted access to update one or more names. 
-We are using Apache basic authentication, so the following can be used to create a new user account and password.<br>
-    ```
-    htpasswd -B secure/htpasswd janeuser
-    ```
+We are using Apache basic authentication, so the following can be used to create a new user account and password.
+```
+htpasswd -B secure/htpasswd janeuser
+```
 
-For (slightly) better security, a user can create their own password entry and have it appended to the passwd file<br>
-    ```
-    htpasswd -n janeuser
-    ```
+For (slightly) better security, a user can create their own password entry and have it appended to the passwd file.
+```
+htpasswd -n janeuser
+```
 
 At this time, we do not support multiple keys for a single user, so, for now, to limit access, we need to create multiple users.<br>
 e.g. janeuser-home, janeuser-work, janeuser-remote
@@ -160,8 +160,10 @@ Each (sub)domain that will be set updates must first be configured on an authori
 
 - Configure the DNS server
     - We are assuming the (sub)domain is already setup and responding to queries.
-    - On the DNS server, generate a new shared TSIG key. The ID used here must be unique within the scope of the DNS server. Saved this outpus in a secure location, it will be used in multiple steps below.<br>
-    `keymgr -t myUniqueKeyID`
+    - On the DNS server, generate a new shared TSIG key. The ID used here must be unique within the scope of the DNS server. Saved this outpus in a secure location, it will be used in multiple steps below.
+        ```
+        keymgr -t myUniqueKeyID
+        ```    
     - Add this to the `key` section of `/etc/knot/knot.conf`. 
     If another key already exists in this file, be sure to add the new key to the existing section.
     This is a YAML file, so be careful of the indentation.
