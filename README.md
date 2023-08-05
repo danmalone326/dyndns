@@ -80,6 +80,12 @@ This information will be needed during the installation
 `git clone git@github.com:danmalone326/dyndns.git`
 - Couldn't figure out how to get git to save this, so we need to secure the `secure` directory.<br>
 `chmod -R o-rwx secure`
+- Copy the password and configuration file templates<br>
+`cp -p data/authorizedHosts.csv.template data/authorizedHosts.csv`<br>
+`cp -p data/zoneInfo.csv.template data/zoneInfo.csv`<br>
+`cp -p secure/htpasswd.template secure/htpasswd`
+- Change group for files needed by the web service.<br>
+`sudo chgrp -hR www-data data secure`
 - Copy the Apache configuration template.<br>
 `sudo cp etc/apache2/dyndns.example.org.conf /etc/apache2/sites-available/dyndns.domain.com.conf`
 - Customize the Apache configuration.<br>
@@ -87,12 +93,6 @@ This information will be needed during the installation
     - ddBaseDirectory - absolute path to the directory the repos was cloned to
     - ddServerName - the full DNS name of the web service
     - Optional: ddServerAlias - any additional DNS names
-- Copy the password and configuration file templates<br>
-`cp -p data/authorizedHosts.csv.template data/authorizedHosts.csv`<br>
-`cp -p data/zoneInfo.csv.template data/zoneInfo.csv`<br>
-`cp -p secure/htpasswd.template secure/htpasswd`
-- Change group for files needed by the web service.<br>
-`sudo chgrp -hR www-data data secure`
 - Optional: Port 8245 may be used to bypass transparent HTTP proxies. To enable this, you will need to allow this port in your firewall.<br>
 `sudo ufw allow 8245/tcp comment 'HTTP for DynDNS'`
 - Enable the new site and restart Apache.<br>
