@@ -136,9 +136,7 @@ Each (sub)domain that will be set updates must first be configured on an authori
 
 - Configure the DNS server
     - We are assuming the (sub)domain is already setup and responding to queries.
-    - On the DNS server, generate a new shared TSIG key
-        - The ID used here must be unique within the scope of the DNS server.
-        - This is a pre-shared key, so must be saved in a secure location. <br>
+    - On the DNS server, generate a new shared TSIG key. The ID used here must be unique within the scope of the DNS server. Saved this outpus in a secure location, it will be used in multiple steps below.<br>
     `keymgr -t myUniqueKeyID`
     - Add this to the `key` section of `/etc/knot/knot.conf`. 
     If another key already exists in this file, be sure to add the new key to the existing section.
