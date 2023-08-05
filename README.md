@@ -165,7 +165,7 @@ Each (sub)domain that will be set updates must first be configured on an authori
         - domain: example.com
             acl: transfer_to_ns3
             acl: myUniqueAclID
-            file: "ddns.outatime.com.zone"
+            file: "example.com.zone"
         ```
     - Test an update via command line before continuing.
         ```
