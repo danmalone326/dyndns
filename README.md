@@ -21,7 +21,9 @@ You will need to enter the following information
 
 You can update DNS manually or with custom scripting using the API by making GET requests to the web service URL:
 
-`https://username:password@dyndns.example.com/nic/update?hostname=subdomain.yourdomain.com&myip=1.2.3.4`
+```
+https://username:password@dyndns.example.com/nic/update?hostname=subdomain.yourdomain.com&myip=1.2.3.4
+```
 
 Updates can be sent over HTTP or HTTPS, with preference to HTTPS since passwords are being used. HTTP on port 8245 is also available and may be used to bypass transparent HTTP proxies.
 
@@ -71,33 +73,51 @@ This information will be needed during the installation
 - Domain name for the web service<br>
 (examples will use `dyndns.domain.com`)
 - The group that the web server is running as<br>
-  `grep APACHE_RUN_GROUP /etc/apache2/envvars`
+  ```
+  grep APACHE_RUN_GROUP /etc/apache2/envvars
+  ```
 
 
 ### Installation
 
 - Clone the repository<br>
-`git clone git@github.com:danmalone326/dyndns.git`
+    ```
+    git clone git@github.com:danmalone326/dyndns.git
+    ```
 - Couldn't figure out how to get git to save this, so we need to secure the `secure` directory.<br>
-`chmod -R o-rwx secure`
+    ```
+    chmod -R o-rwx secure
+    ```
 - Copy the password and configuration file templates<br>
-`cp -p data/authorizedHosts.csv.template data/authorizedHosts.csv`<br>
-`cp -p data/zoneInfo.csv.template data/zoneInfo.csv`<br>
-`cp -p secure/htpasswd.template secure/htpasswd`
+    ```
+    cp -p data/authorizedHosts.csv.template data/authorizedHosts.csv
+    cp -p data/zoneInfo.csv.template data/zoneInfo.csv
+    cp -p secure/htpasswd.template secure/htpasswd
+    ```
 - Change group for files needed by the web service.<br>
-`sudo chgrp -hR www-data data secure`
+    ```
+    sudo chgrp -hR www-data data secure
+    ```
 - Copy the Apache configuration template.<br>
-`sudo cp etc/apache2/dyndns.example.org.conf /etc/apache2/sites-available/dyndns.domain.com.conf`
+    ```
+    sudo cp etc/apache2/dyndns.example.org.conf /etc/apache2/sites-available/dyndns.domain.com.conf
+    ```
 - Customize the Apache configuration.<br>
-`vi /etc/apache2/sites-available/dyndns.domain.com.conf`
+    ```
+    vi /etc/apache2/sites-available/dyndns.domain.com.conf
+    ```
     - ddBaseDirectory - absolute path to the directory the repos was cloned to
     - ddServerName - the full DNS name of the web service
     - Optional: ddServerAlias - any additional DNS names
 - Optional: Port 8245 may be used to bypass transparent HTTP proxies. To enable this, you will need to allow this port in your firewall.<br>
-`sudo ufw allow 8245/tcp comment 'HTTP for DynDNS'`
+    ```
+    sudo ufw allow 8245/tcp comment 'HTTP for DynDNS'
+    ```
 - Enable the new site and restart Apache.<br>
-`sudo a2ensite dyndns.domain.com`<br>
-`sudo systemctl reload apache2`
+    ```
+    sudo a2ensite dyndns.domain.com
+    sudo systemctl reload apache2
+    ```
 
 ## Configuration
 There are 4 steps required to allow DNS updates.
@@ -109,10 +129,14 @@ There are 4 steps required to allow DNS updates.
 ### Creating a new user account
 A user account will be granted access to update one or more names. 
 We are using Apache basic authentication, so the following can be used to create a new user account and password.<br>
-`htpasswd -B secure/htpasswd janeuser`
+    ```
+    htpasswd -B secure/htpasswd janeuser
+    ```
 
 For (slightly) better security, a user can create their own password entry and have it appended to the passwd file<br>
-`htpasswd -n janeuser`
+    ```
+    htpasswd -n janeuser
+    ```
 
 At this time, we do not support multiple keys for a single user, so, for now, to limit access, we need to create multiple users.<br>
 e.g. janeuser-home, janeuser-work, janeuser-remote
@@ -123,7 +147,7 @@ Users are granted access to updating hosts through patterns. Patterns can match 
 Patterns must also reference the zone (see below) where the update will be sent. 
 When users are granted access to multiple patterns, the first match of username and hostname to pattern found will be used.
 
-Add patterns to the file `ata/authorizedHosts.csv`
+Add patterns to the file `data/authorizedHosts.csv`
 ```
 authorizedUser,pattern,zoneName
 janedoe,site1.example.com,example.com
