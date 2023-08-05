@@ -29,16 +29,14 @@ Updates can be sent over HTTP or HTTPS, with preference to HTTPS since passwords
 
 The hostname parameter is required. Only one of the additional parameters may be used at the same time. An IP address update is the default if no additional parameter is included.
 
-- **hostname** (required) - Comma separated list of hostnames to update (max 20)
-    - Each hostname specified will be updated with the same information, and the return codes will be given one per line, in the same order as given.
-
-- **myip** - Comma separated list of IP addresses to set for the update (max 20)
-    - Supports both IPv6 and IPv4 addresses. If this parameter is not specified, the best IP address the server can determine will be used (some proxy configurations pass the IP in a header, and that is detected by the server). Any IP addresses passed to the system that are not properly formed will be ignored and the system’s best guess will be used.
-- **txt** - TXT value to set for the update
-    - If this parameter is specified, a TXT record will be added/updated for the hostname
-
-- **delete** - A comma separated list of record types to delete
-    - Will delete all the records of the specified type(s). The list can contain the following values: A, AAAA, TXT . ALL can also be used which will delete all allowed values.
+- **hostname** (required) - Comma separated list of hostnames to update (max 20)<br>
+Each hostname specified will be updated with the same information, and the return codes will be given one per line, in the same order as given.
+- **myip** - Comma separated list of IP addresses to set for the update (max 20)<br>
+Supports both IPv6 and IPv4 addresses. If this parameter is not specified, the best IP address the server can determine will be used (some proxy configurations pass the IP in a header, and that is detected by the server). Any IP addresses passed to the system that are not properly formed will be ignored and the system’s best guess will be used.
+- **txt** - TXT value to set for the update<br>
+If this parameter is specified, a TXT record will be added/updated for the hostname
+- **delete** - A comma separated list of record types to delete<br>
+Will delete all the records of the specified type(s). The list can contain the following values: A AAAA TXT . ALL can be used to delete records for all of these types.
 
 #### Return Codes
 
