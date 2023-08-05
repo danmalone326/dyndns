@@ -27,69 +27,36 @@ Updates can be sent over HTTP or HTTPS, with preference to HTTPS since passwords
 
 #### Update Parameters
 
-hostname (required)
-: Comma separated list of hostnames to update (max 20)
-: Each hostname specified will be updated with the same information, and the return codes will be given one per line, in the same order as given.
+The hostname parameter is required. Only one of the additional parameters may be used at the same time. An IP address update is the default if no additional parameter is included.
 
-myip
-: Comma separated list of IP addresses to set for the update (max 20)
-: Supports both IPv6 and IPv4 addresses. If this parameter is not specified, the best IP address the server can determine will be used (some proxy configurations pass the IP in a header, and that is detected by the server). Any IP addresses passed to the system that are not properly formed will be ignored and the system’s best guess will be used.
+- **hostname** (required) - Comma separated list of hostnames to update (max 20)
+    - Each hostname specified will be updated with the same information, and the return codes will be given one per line, in the same order as given.
 
-txt
-: TXT value to set for the update
-: If this parameter is specified, a TXT record will be added/updated for the hostname
+- **myip** - Comma separated list of IP addresses to set for the update (max 20)
+    - Supports both IPv6 and IPv4 addresses. If this parameter is not specified, the best IP address the server can determine will be used (some proxy configurations pass the IP in a header, and that is detected by the server). Any IP addresses passed to the system that are not properly formed will be ignored and the system’s best guess will be used.
+- **txt** - TXT value to set for the update
+    - If this parameter is specified, a TXT record will be added/updated for the hostname
 
-delete
-: A comma separated list of record types to delete
-: Will delete all the records of the specified type(s). The list can contain the following values: 
-A,
-AAAA,
-TXT,
-ALL. 
-If ALL is used, all allowed values will be deleted.
+- **delete** - A comma separated list of record types to delete
+    - Will delete all the records of the specified type(s). The list can contain the following values: A, AAAA, TXT . ALL can also be used which will delete all allowed values.
 
 #### Return Codes
 
-badauth
-: The username and password pair do not match a real user.
+- **badauth** - The username and password pair do not match an existing user.
+- **good** &lt;value&gt; - The update was successful, and the hostname is now updated.
+- **nochg** &lt;value&gt; - The update changed no settings, and is considered abusive. Additional nochg updates will cause the hostname to become blocked. [^1]
+- **notfqdn** - The hostname specified is not a fully-qualified domain name (not in the form hostname.example.org or example.com). If no hostnames were specified, notfqdn will be returned once.
+- **nohost** - The hostname specified is not found for this user.
+- **numhost** - Too many hosts (more than 20) specified in an update.
+- **numip** - Too many IP addresses (more than 20) specified in an update.
+- **abuse** [^1] - The hostname specified is blocked for update abuse.
+- **badagent** [^1] - The user agent was not sent or HTTP method is not permitted (we recommend use of GET request method).
+- **badparam** - The parameter combinations are not valid for the given operation.
+- **badop** - The request is not a valid operation.
+- **dnserr** - DNS error was encountered.
+- **911** - There is a problem.
 
-good &lt;value&gt;
-: The update was successful, and the hostname is now updated.
-
-nochg &lt;value&gt;
-: The update changed no settings, and is considered abusive. Additional nochg updates will cause the hostname to become blocked. [^1]
-
-notfqdn
-: The hostname specified is not a fully-qualified domain name (not in the form hostname.example.org or example.com). If no hostnames were specified, notfqdn will be returned once.
-
-nohost
-: The hostname specified is not found for this user.
-
-numhost
-: Too many hosts (more than 20) specified in an update.
-
-numip
-: Too many IP addresses (more than 20) specified in an update.
-
-abuse [^1]
-: The hostname specified is blocked for update abuse.
-
-badagent [^1]
-: The user agent was not sent or HTTP method is not permitted (we recommend use of GET request method).
-
-badparam
-: The parameter combinations are not valid for the given operation.
-
-badop
-: The request is not a valid operation.
-
-dnserr
-: DNS error was encountered.
-
-911
-: There is a problem.
-
-[^1]: Abuse monitoring is not implemented yet
+[^1]: Abuse monitoring is not implemented yet, so don't do it.
 
 
 ## Installation
