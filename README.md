@@ -177,7 +177,7 @@ Each (sub)domain that will be set updates must first be configured on an authori
 
 - Configure the DNS server
     - We are assuming the (sub)domain is already setup and responding to queries.
-    - On the DNS server, generate a new shared TSIG key. The ID used here must be unique within the scope of the DNS server. Saved this output in a secure location, it will be used in multiple steps below.
+    - On the DNS server, generate a new shared TSIG key. The ID used here must be unique within the scope of the DNS server. Save this output in a secure location, it will be used in multiple steps below.
         ```
         keymgr -t myUniqueKeyID
         ```    
