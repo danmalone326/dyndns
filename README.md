@@ -130,6 +130,10 @@ This information will be needed during the installation
     sudo a2ensite dyndns.domain.com
     sudo systemctl reload apache2
     ```
+- Verify the web server is responding.
+    ```
+    http://dyndns.domain.com/checkip
+    ```
 - (Optional/Recommended) Enabling SSL/TLS for the web service is highly recommended, but beyond the scope of this document. The above setup should allow letsencrypt's HTTP domain validation.
 
 ## Configuration
