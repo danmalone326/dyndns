@@ -22,7 +22,7 @@ You will need to enter the following information
 You can update DNS manually or with custom scripting using the API by making GET requests to the web service URL:
 
 ```
-https://username:password@dyndns.example.com/nic/update?hostname=subdomain.yourdomain.com&myip=1.2.3.4
+https://username:password@dyndns.domain.com/nic/update?hostname=host.example.com&myip=1.2.3.4
 ```
 
 Updates can be sent over HTTP or HTTPS, with preference to HTTPS since passwords are being used. HTTP on port 8245 is also available and may be used to bypass transparent HTTP proxies.
@@ -63,7 +63,7 @@ Will delete all the records of the specified type(s). The list can contain the f
 You can check the best IP address the server can determine by using the `checkip` endpoint. The optional **myip** parameter can be used for troubleshooting to verify what address would be used.
 
 ```
-https://dyndns.example.com/checkip
+https://dyndns.domain.com/checkip
 ```
 
 
@@ -132,7 +132,7 @@ This information will be needed during the installation
     ```
 - Verify the web server is responding.
 ```
-http://dyndns.example.com/checkip
+http://dyndns.domain.com/checkip
 ```
 - (Optional/Recommended) Enabling SSL/TLS for the web service is highly recommended, but beyond the scope of this document. The above setup should allow letsencrypt's HTTP domain validation.
 
