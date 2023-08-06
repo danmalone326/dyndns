@@ -58,6 +58,14 @@ Will delete all the records of the specified type(s). The list can contain the f
 
 [^1]: Abuse monitoring is not implemented yet, so don't do it.
 
+#### Check IP
+
+You can check the best IP address the server can determine by using the `checkip` endpoint. The optional **myip** parameter can be used for troubleshooting to verify what address would be used.
+
+```
+https://dyndns.example.com/checkip
+```
+
 
 ## Installation
 
@@ -67,6 +75,10 @@ These items are required before continuing and are outside the scope of this doc
 - Web server installed and running. Code/tips in this document assume Apache.
 - DNS for the web service hostname pointing to the installed web server.
 - Authoritative DNS server for the domain(s) that will be available for updates.
+- The `dnspython` python module is required.
+    ```
+    sudo pip3 install dnspython
+    ```
 
 This information will be needed during the installation
 - Base directory where this project will be installed.
@@ -118,6 +130,11 @@ This information will be needed during the installation
     sudo a2ensite dyndns.domain.com
     sudo systemctl reload apache2
     ```
+- Verify the web server is responding.
+```
+http://dyndns.example.com/checkip
+```
+- (Optional/Recommended) Enabling SSL/TLS for the web service is highly recommended, but beyond the scope of this document. The above setup should allow letsencrypt's HTTP domain validation.
 
 ## Configuration
 There are 4 steps required to allow DNS updates.
