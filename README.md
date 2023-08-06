@@ -118,7 +118,7 @@ This information will be needed during the installation
     ```
     vi /etc/apache2/sites-available/dyndns.domain.com.conf
     ```
-    - ddBaseDirectory - absolute path to the directory the repos was cloned to
+    - ddBaseDirectory - absolute path to the directory this repo was cloned to
     - ddServerName - the full DNS name of the web service
     - Optional: ddServerAlias - any additional DNS names
 - Optional: Port 8245 may be used to bypass transparent HTTP proxies. To enable this, you will need to allow this port in your firewall.<br>
