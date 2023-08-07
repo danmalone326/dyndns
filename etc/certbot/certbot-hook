@@ -1,20 +1,19 @@
 #!/bin/bash
-#
 # call this script for both the auth-hook and the cleanup-hook
-# usage:  certbot-hook auth|cleanup
-usage()
-{
-  echo "Usage: $0 auth|cleanup"
-  exit 1
-}
+# certbot sets the $CERTBOT_AUTH_OUTPUT environment variable only for cleanup
 
-if [ $# -eq 0 ]; then
-  usage
-fi
-
-# Assumes these 2 come from certbot
+#
+# for testing
+#
+#CERTBOT_DOMAIN=tester.malone.org
+#CERTBOT_VALIDATION=fedbca9876543210
+#CERTBOT_AUTH_OUTPUT=good
+# Assumes these come from certbot
+#echo ---
 #echo $CERTBOT_DOMAIN
 #echo $CERTBOT_VALIDATION
+#echo $CERTBOT_AUTH_OUTPUT
+#echo ---
 
 DYNDNS_URL="https://update.example.org/nic/update"
 DYNDNS_USERNAME="johndoe"
@@ -31,17 +30,17 @@ DDNS_DOMAIN=$(echo $CERTBOT_DOMAIN | sed -e "$DDNS_REGEX")
 TXT_RECORD="_acme-challenge.${DDNS_DOMAIN}"
 #echo $TXT_DOMAIN
 
-if [[ $1 == "auth" ]]; then
+if [[ -z "${CERTBOT_AUTH_OUTPUT}" ]]
+then
+# if $CERTBOT_AUTH_OUTPUT is not set (zero length), this is auth step
   QUERY_STRING="hostname=${TXT_RECORD}&txt=${CERTBOT_VALIDATION}"
-elif [[ $1 == "cleanup" ]]; then
-  QUERY_STRING="hostname=${TXT_RECORD}&delete=TXT"
 else
-  usage
+# if $CERTBOT_AUTH_OUTPUT is set, means this is cleanup step
+  QUERY_STRING="hostname=${TXT_RECORD}&delete=TXT"
 fi
 
-CURL_COMMAND="/usr/bin/curl -K- ${DYNDNS_URL}?${QUERY_STRING}"
-
-echo $CURL_COMMAND
+CURL_COMMAND="/usr/bin/curl --silent -K- ${DYNDNS_URL}?${QUERY_STRING}"
+#echo $CURL_COMMAND
 
 $CURL_COMMAND <<EOF
 -u $DYNDNS_USERNAME:$DYNDNS_PASSWORD
