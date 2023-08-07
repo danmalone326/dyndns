@@ -135,6 +135,11 @@ This information will be needed during the installation
     http://dyndns.domain.com/checkip
     ```
 - (Optional/Recommended) Enabling SSL/TLS for the web service is highly recommended, but beyond the scope of this document. The above setup should allow letsencrypt's HTTP domain validation.
+    - My notes from certbot
+        - had to remove the UnDefines at the end of the conf file
+        - had to comment out the ServerAlias line, certbot doesn't understand the IfDefine
+        - actually, in the end, using variables in the config completely broke the certbot compatibility. I'll have to try something else for this later.
+        - after certbot completed, commented out the http->https redirect, some clients only do http
 
 ## Configuration
 There are 4 steps required to allow DNS updates.
