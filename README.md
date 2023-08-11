@@ -73,6 +73,10 @@ https://dyndns.domain.com/checkip
 
 These items are required before continuing and are outside the scope of this document
 - Web server installed and running. Code/tips in this document assume Apache.
+    - Enable Apaches mod_rewrite
+        ```
+        sudo a2enmod rewrite
+        ```
 - DNS for the web service hostname pointing to the installed web server.
 - Authoritative DNS server for the domain(s) that will be available for updates.
 - The `dnspython` python module is required.
