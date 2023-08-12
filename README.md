@@ -146,12 +146,10 @@ This filename is given in the output of the previous step
     ```
     http://dyndns.domain.com/checkip
     ```
-- (Optional/Recommended) Enabling SSL/TLS for the web service is highly recommended, but beyond the scope of this document. The above setup should allow letsencrypt's HTTP domain validation.
-    - My notes from certbot
-        - had to remove the UnDefines at the end of the conf file
-        - had to comment out the ServerAlias line, certbot doesn't understand the IfDefine
-        - actually, in the end, using variables in the config completely broke the certbot compatibility. I'll have to try something else for this later.
-        - after certbot completed, commented out the http->https redirect, some clients only do http
+- (Optional/Recommended) Enabling SSL/TLS for the web service is highly recommended, but beyond the scope of this document. Assuming this site is accessible publicly, the above setup should enable letsencrypt's HTTP-01 domain validation.
+    ```
+    sudo certbot --apache --no-redirect
+    ```
 
 ## Configuration
 There are 4 steps required to allow DNS updates.
