@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+
+import os
+
+scriptDir = os.path.dirname(os.path.abspath(__file__))
+parentDir = os.path.dirname(scriptDir)
+grandparentDir = os.path.dirname(parentDir)
+
+templateFile = os.path.join(scriptDir, "dyndns.example.org.conf.template")
+lastRunFile = os.path.join(scriptDir, "lastRun.conf")
+
+# Default values
+defaultServerDnsName = "dyndns.example.org"
+defaultInstallDirectory = grandparentDir
+defaultServerAdmin = "admin@example.org"
+
+# Check if lastRun.conf file exists and load values from it
+if os.path.exists(lastRunFile):
+    with open(lastRunFile, "r") as f:
+        exec(f.read())
+
+# Function to prompt for input with a default value
+def promptInput(promptMessage, defaultValue):
+    userInput = input(f"{promptMessage} [{defaultValue}]: ")
+    return userInput if userInput else defaultValue
+
+# Prompt for replacements
+installDirectory = promptInput("Repo install directory", defaultInstallDirectory)
+serverDnsName = promptInput("Server full DNS name", defaultServerDnsName)
+serverAdmin = promptInput("Admin email address", defaultServerAdmin)
+
+# Save prompt results to lastRun.conf
+with open(lastRunFile, "w") as f:
+    f.write(f"defaultServerDnsName = \"{serverDnsName}\"\n")
+    f.write(f"defaultInstallDirectory = \"{installDirectory}\"\n")
+    f.write(f"defaultServerAdmin = \"{serverAdmin}\"\n")
+
+# Perform search and replace
+outputFile = os.path.join(scriptDir, f"{serverDnsName}.conf")
+with open(templateFile, "r") as template, open(outputFile, "w") as output:
+    for line in template:
+        line = line.replace("{{SERVER_DNS_NAME}}", serverDnsName)
+        line = line.replace("{{INSTALL_DIRECTORY}}", installDirectory)
+        line = line.replace("{{SERVER_ADMIN}}", serverAdmin)
+        output.write(line)
+
+print("Apache config file generated:", outputFile)

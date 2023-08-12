@@ -110,17 +110,24 @@ This information will be needed during the installation
     ```
     sudo chgrp -hR www-data data secure
     ```
+- Create the Apache configuration.<br>
+    ```
+    etc/apache2/makeApacheConfig
+    ```
+    - Repo install directory - absolute path to the directory this repo was cloned to
+    - Server full DNS name - the full DNS name of this web service
+    - Admin email address - Displayed on error web page when thing go really wrong
 - Copy the Apache configuration template.<br>
+This filename is given in the output of the previous step
     ```
-    sudo cp etc/apache2/dyndns.example.org.conf /etc/apache2/sites-available/dyndns.domain.com.conf
+    sudo cp etc/apache2/dyndns.example.org.conf /etc/apache2/sites-available/
     ```
-- Customize the Apache configuration.<br>
+- Optional: Customize the Apache configuration.<br>
+    - Add secondary domains with ServerAlias
+    - Change log file location
     ```
     vi /etc/apache2/sites-available/dyndns.domain.com.conf
     ```
-    - ddBaseDirectory - absolute path to the directory this repo was cloned to
-    - ddServerName - the full DNS name of the web service
-    - Optional: ddServerAlias - any additional DNS names
 - Optional: Port 8245 may be used to bypass transparent HTTP proxies. To enable this, you will need to allow this port in your firewall.<br>
     ```
     sudo ufw allow 8245/tcp comment 'HTTP for DynDNS'

@@ -5,37 +5,30 @@
 # After SSL is enabled, any changes to this file will need to be
 # made to both config files, non-SSL and SSL.
 
-Define ddBaseDirectory /home/dyndns
-Define ddServerName dyndns.example.com
-
-# uncomment next line if you want to respond to additional names
-#Define ddServerAlias home.example.com site.example.org
-
 ####
-#### You should not need to edit anything below here unless you know you need to
+#### You should not need to edit anything here unless you know you need to
 ####
-
-Define ddDocumentRoot ${ddBaseDirectory}/www
 
 # Port 8245 may be used to bypass transparent HTTP proxies.
 # You will need to modify your firewall to allow this port.
 Listen 8245
 <VirtualHost *:80 *:8245>
-	ServerName ${ddServerName}
-	<IfDefine ddServerAlias>
-	ServerAlias ${ddServerAlias}
-	</IfDefine>
+	ServerName {{SERVER_DNS_NAME}}
+	ServerAdmin {{SERVER_ADMIN}}
+	
+	# uncomment next line if you want to respond to additional names
+	# ServerAlias dyndns.otherdomain.com dyndns.mydomain.com
+	
+	DocumentRoot {{INSTALL_DIRECTORY}}/www
 
-	DocumentRoot ${ddDocumentRoot}
-
-	<Directory ${ddDocumentRoot}>
+	<Directory {{INSTALL_DIRECTORY}}/www>
 		AllowOverride None
 		Require all granted
 	</Directory>
 
 	# if you want your log files in a different place, here is where you change that
-	ErrorLog ${APACHE_LOG_DIR}/${ddServerName}.error.log
-	CustomLog ${APACHE_LOG_DIR}/${ddServerName}.access.log combined
+	ErrorLog ${APACHE_LOG_DIR}/{{SERVER_DNS_NAME}}.error.log
+	CustomLog ${APACHE_LOG_DIR}/{{SERVER_DNS_NAME}}.access.log combined
 
 	# Error Documents
 	ErrorDocument 401 /error/badauth.txt
@@ -52,8 +45,9 @@ Listen 8245
 	# redirect all pages
 	RewriteEngine On
 
-	# If the request is for an existing file in /.well-known/acme-challenge/, serve it directly.
+	# for acme HTTP-01 verification, allow files in /.well-known/acme-challenge/
 	RewriteCond %{REQUEST_URI} ^/\.well-known/acme-challenge/ [NC,OR]
+	# simple error files are here
 	RewriteCond %{REQUEST_URI} ^/error/ [NC]
 	RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} -f
 	RewriteRule ^ - [L]
@@ -66,7 +60,7 @@ Listen 8245
 	RewriteRule ^ /cgi-bin/update [L]
 
 	# set here to make available in cgi script
-	SetEnv DD_BASE_DIR ${ddBaseDirectory}
+	SetEnv DD_BASE_DIR {{INSTALL_DIRECTORY}}
 
 	# allow unauthenticated cgi script
 	<FilesMatch unauth$>
@@ -78,16 +72,11 @@ Listen 8245
 	<FilesMatch update$>
 		AuthType Basic
 		AuthName "Restricted Content"
-		AuthUserFile ${ddBaseDirectory}/secure/htpasswd
+		AuthUserFile {{INSTALL_DIRECTORY}}/secure/htpasswd
 		Require valid-user
 		Options +ExecCGI
 		SetHandler cgi-script
 	</FilesMatch>
 </VirtualHost>
 
-UnDefine ddServerName 
-<IfDefine ddServerAlias>
-UnDefine ddServerAlias
-</IfDefine>
-UnDefine ddDocumentRoot
-UnDefine ddBaseDirectory
+# vim: set ft=apache2:
