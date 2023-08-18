@@ -79,7 +79,7 @@ These items are required before continuing and are outside the scope of this doc
         sudo a2enmod cgi
         ```
 - DNS for the web service hostname pointing to the installed web server.
-- Authoritative DNS server for the domain(s) that will be available for updates.
+- Authoritative DNS server for the domain(s) that will be available for updates. Code/tips in this document assume Knot DNS.
 - The `dnspython` python module is required.
     ```
     sudo pip3 install dnspython
@@ -187,7 +187,7 @@ janedoe,site2.example.com,example.com
 johndoe,*.example.org,example.org
 ```
 
-### Configuring a new zone for Dynamic DNS updates
+### Configuring a new zone for Dynamic DNS updates (for Knot DNS)
 Each (sub)domain that will be set updates must first be configured on an authoritative DNS server. In this document, we configure DNS to allow updates to the entire zone, even though we may limit the update using the authorizations above. You may want to consider additional security to limit what hostnames can be updated. Another option is to create a subdomain zone that allows updates only.
 
 - Configure the DNS server
