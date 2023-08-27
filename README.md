@@ -190,83 +190,84 @@ johndoe,*.updatedomain.com,updatedomain.com
 ### Configuring a new zone for Dynamic DNS updates
 Each (sub)domain that will be allowed for updates must first be configured on an authoritative DNS server. In this document, we configure DNS to allow updates to the entire zone, even though we may limit the update using the authorizations above. You may want to consider additional security to limit what hostnames can be updated. Another option is to create a subdomain zone that allows updates only. 
 
-- <details>
-    <summary>Configure Bind9 for Dynamic DNS</summary>
+- Configure Authoritative DNS Server for Secure Dynamic Updates
+    - <details>
+        <summary>Configure Bind9 for Dynamic DNS</summary>
 
-    - We are assuming the (sub)domain is already setup and responding to queries.
-    - On the DNS server, generate a new shared TSIG key. The key name used here must be unique within the scope of the DNS server. Save this output in a secure location, it will be used in multiple steps below.
-        ```
-        tsig-keygen myUniqueKeyName
-        ```    
-    - Insert the output into the bind config `/etc/named.conf.local`. 
-        ```
-        key "myUniqueKeyName" {
-            algorithm hmac-sha256;
-            secret "84bZnP+IDhtz++++raqEk+q5grmji5RqNNEQr+sNb+k=";
-        };
-        ```
-    - Add an `acl` section to `/etc/named.conf.local`. 
-    At a minimum, the acl should contain the IP address of the web service that will be submitting the updates, or localhost IP if running on the same server. Multiple addresses can be included. The acl name used here must be unique within the scope of the DNS server.
-        ```
-        acl "myUniqueAclID" {
-            127.0.0.1;
-            172.20.3.1;
-            key myUniqueKeyName;
-        };
-        ```
-    - Add an `allow-update` option to the existing `zone` section using the new `acl`.
-        ```
-        zone "updatedomain.com" IN {
-            type master;
-            file "/var/lib/bind/zones/updatedomain.com";
-            allow-update {myUniqueAclID;};
-        };
+        - We are assuming the (sub)domain is already setup and responding to queries.
+        - On the DNS server, generate a new shared TSIG key. The key name used here must be unique within the scope of the DNS server. Save this output in a secure location, it will be used in multiple steps below.
+            ```
+            tsig-keygen myUniqueKeyName
+            ```    
+        - Insert the output into the bind config `/etc/named.conf.local`. 
+            ```
+            key "myUniqueKeyName" {
+                algorithm hmac-sha256;
+                secret "84bZnP+IDhtz++++raqEk+q5grmji5RqNNEQr+sNb+k=";
+            };
+            ```
+        - Add an `acl` section to `/etc/named.conf.local`. 
+        At a minimum, the acl should contain the IP address of the web service that will be submitting the updates, or localhost IP if running on the same server. Multiple addresses can be included. The acl name used here must be unique within the scope of the DNS server.
+            ```
+            acl "myUniqueAclID" {
+                127.0.0.1;
+                172.20.3.1;
+                key myUniqueKeyName;
+            };
+            ```
+        - Add an `allow-update` option to the existing `zone` section using the new `acl`.
+            ```
+            zone "updatedomain.com" IN {
+                type master;
+                file "/var/lib/bind/zones/updatedomain.com";
+                allow-update {myUniqueAclID;};
+            };
 
-        ```
-    - Check the configuration.
-        ```
-        sudo named-checkconf -p /etc/named/named.conf
-        ```
-    - Restart bind9.
-    </details>
+            ```
+        - Check the configuration.
+            ```
+            sudo named-checkconf -p /etc/named/named.conf
+            ```
+        - Restart bind9.
+        </details>
 
-- <details>
-    <summary>Configure Knot for Dynamic DNS</summary>
+    - <details>
+        <summary>Configure Knot for Dynamic DNS</summary>
 
-    - We are assuming the (sub)domain is already setup and responding to queries.
-    - On the DNS server, generate a new shared TSIG key. The ID used here must be unique within the scope of the DNS server. Save this output in a secure location, it will be used in multiple steps below.
-        ```
-        keymgr -t myUniqueKeyName
-        ```    
-    - Add this to the `key` section of `/etc/knot/knot.conf`. 
-    If another key already exists in this file, be sure to add the new key to the existing section.
-    This is a YAML file, so be careful of the indentation.
-        ```
-        key:
-        - id: myUniqueKeyName
-            algorithm: hmac-sha256
-            secret: oZYLbK4wx0dhCcv++HIsBIeQDK0=
-        ```
-    - Add to the `acl` section of `/etc/knot/knot.conf`. 
-    At a minimum, the acl should contain the IP address of the web service that will be submitting the updates, or localhost IP if running on the same server. Multiple address keys can be included.
-        ```
-        acl:
-        - id: myUniqueAclID
-            address: 127.0.0.1
-            address: 172.20.3.1
-            action: update
-            key: myUniqueKeyName
-        ```
-    - Add the acl to the existing `zone` section for the zone. Be sure to add this new acl as there may be others already existing, e.g. for zone transfers.
-        ```
-        zone:
-        - domain: updatedomain.com
-            acl: transfer_to_ns3
-            acl: myUniqueAclID
-            file: "updatedomain.com.zone"
-        ```
-    - Restart the knot service.
-    </details>
+        - We are assuming the (sub)domain is already setup and responding to queries.
+        - On the DNS server, generate a new shared TSIG key. The ID used here must be unique within the scope of the DNS server. Save this output in a secure location, it will be used in multiple steps below.
+            ```
+            keymgr -t myUniqueKeyName
+            ```    
+        - Add this to the `key` section of `/etc/knot/knot.conf`. 
+        If another key already exists in this file, be sure to add the new key to the existing section.
+        This is a YAML file, so be careful of the indentation.
+            ```
+            key:
+            - id: myUniqueKeyName
+                algorithm: hmac-sha256
+                secret: oZYLbK4wx0dhCcv++HIsBIeQDK0=
+            ```
+        - Add to the `acl` section of `/etc/knot/knot.conf`. 
+        At a minimum, the acl should contain the IP address of the web service that will be submitting the updates, or localhost IP if running on the same server. Multiple address keys can be included.
+            ```
+            acl:
+            - id: myUniqueAclID
+                address: 127.0.0.1
+                address: 172.20.3.1
+                action: update
+                key: myUniqueKeyName
+            ```
+        - Add the acl to the existing `zone` section for the zone. Be sure to add this new acl as there may be others already existing, e.g. for zone transfers.
+            ```
+            zone:
+            - domain: updatedomain.com
+                acl: transfer_to_ns3
+                acl: myUniqueAclID
+                file: "updatedomain.com.zone"
+            ```
+        - Restart the knot service.
+        </details>
 
 - Test an update via command line before continuing. 
     - This can be difficult to troubleshoot. Check `/var/log/syslog`
@@ -285,7 +286,7 @@ Each (sub)domain that will be allowed for updates must first be configured on an
         > send
         > quit
         ```
-- Make the zone available in the web service
+- Make the zone available in the dyndns web service
     - Create a key file in the `secure` directory. This key file needs a unique name and should have a `.key` extension, e.g. `updatedomain.com.key`. This key file contains a single line with values for algorithm, keyname, and secretkey separated by colons.
         ```
         hmac-sha256:myUniqueKeyName:oZYLbK4wx0dhCcv++HIsBIeQDK0=
