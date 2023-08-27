@@ -22,7 +22,7 @@ You will need to enter the following information
 You can update DNS manually or with custom scripting using the API by making GET requests to the web service URL:
 
 ```
-https://username:password@dyndns.domain.com/nic/update?hostname=host.example.com&myip=1.2.3.4
+https://username:password@dyndns.domain.com/nic/update?hostname=host.updatedomain.com&myip=1.2.3.4
 ```
 
 Updates can be sent over HTTP or HTTPS, with preference to HTTPS since passwords are being used. HTTP on port 8245 is also available and may be used to bypass transparent HTTP proxies.
@@ -184,7 +184,7 @@ Add patterns to the file `data/authorizedHosts.csv`
 authorizedUser,pattern,zoneName
 janedoe,site1.example.com,example.com
 janedoe,site2.example.com,example.com
-johndoe,*.example.org,example.org
+johndoe,*.updatedomain.com,updatedomain.com
 ```
 
 ### Configuring a new zone for Dynamic DNS updates
