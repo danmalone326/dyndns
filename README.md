@@ -190,7 +190,7 @@ johndoe,*.updatedomain.com,updatedomain.com
 ### Configuring a new zone for Dynamic DNS updates
 Each (sub)domain that will be allowed for updates must first be configured on an authoritative DNS server. In this document, we configure DNS to allow updates to the entire zone, even though we may limit the update using the authorizations above. You may want to consider additional security to limit what hostnames can be updated. Another option is to create a subdomain zone that allows updates only. 
 
-- Configure Authoritative DNS Server for Secure Dynamic Updates
+- Configure Authoritative DNS Server for Secure Dynamic Updates. These guides should help but additional configuration may be necessary for your setup.
     - <details>
         <summary>Configure Bind9 for Dynamic DNS</summary>
 
