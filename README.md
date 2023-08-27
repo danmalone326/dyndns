@@ -288,7 +288,7 @@ Each (sub)domain that will be allowed for updates must first be configured on an
 - Make the zone available in the web service
     - Create a key file in the `secure` directory. This key file needs a unique name and should have a `.key` extension, e.g. `updatedomain.com.key`. This key file contains a single line with values for algorithm, keyname, and secretkey separated by colons.
         ```
-        hmac-sha256:martymcfly:oZYLbK4wx0dhCcv++HIsBIeQDK0=
+        hmac-sha256:myUniqueKeyName:oZYLbK4wx0dhCcv++HIsBIeQDK0=
         ```
     - Set the key file to have the same permissions and ownership as the htpasswd file.
         ```
