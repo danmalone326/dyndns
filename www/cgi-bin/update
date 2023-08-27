@@ -258,11 +258,31 @@ def getCurrentDNS(hostname,recordType,nameServerIP,nameServerPort):
     return result
 
 # gets the secure key information for a given zone
+# keyfile is in the format:
+# algorithm:keyname:secretkey
 def getTsigKey(zoneInfo):
     try:
         keyPath = f'{secureDir}/{zoneInfo["keyFile"]}'
-        with open(keyPath, 'r') as f:
-            data = yaml.load(f)["key"][0]
+        if debug:
+            print(keyPath)
+        with open(keyPath, 'r') as file:
+            line = file.readline().strip()
+            if debug:
+                print(line)
+            fields = line.split(':')
+            
+            if len(fields) != 3:
+                if debug:
+                    print("not 3 fields")
+                raise ValueError("File should contain exactly 3 colon-separated fields.")
+            
+            algorithm, id_, secret = fields
+            resultDict = {
+                "algorithm": algorithm,
+                "id": id_,
+                "secret": secret
+            }
+            return resultDict
     except:
         problemStop("getTsigKey")
     return data
