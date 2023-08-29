@@ -235,8 +235,9 @@ def getCurrentDNS(hostname,recordType,nameServerIP,nameServerPort):
     resolver = dns.resolver.Resolver()
     resolver.nameservers = [nameServerIP]
     resolver.port = nameServerPort
-    resolver.no_recurse = True
-
+    # resolver.no_recurse = True
+    resolver.set_flags(0b0000000000000000)
+    
     if debug:
         print(resolver.nameservers)
         print(resolver.port)
