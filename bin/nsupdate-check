@@ -1,0 +1,192 @@
+#!/usr/bin/python3
+import dns.query
+import dns.tsigkeyring
+import dns.update
+import dns.resolver
+
+debug = False
+
+# simple dns lookup that returns the list of values
+def getCurrentDNS(queryHostname,recordType='A',nameServerIP=None,nameServerPort=53,recursive=True):
+    resolver = dns.resolver.Resolver()
+
+    if (nameServerIP!=None):
+        resolver.nameservers = [nameServerIP]
+        resolver.port = nameServerPort
+    # resolver.no_recurse = True
+    if (not recursive):
+        resolver.set_flags(0b0000000000000000)
+
+    if debug:
+        print(queryHostname)
+        print(recordType)
+        print(resolver.nameservers)
+        print(resolver.port)
+
+    result = []
+    try:
+        answers = resolver.resolve(queryHostname, rdtype=recordType)
+        if debug:
+            print(str(len(answers)) + " Answers")
+        # put the values for each of the answers into the list
+        result.extend(str(answer) for answer in answers)
+    except dns.resolver.NXDOMAIN:
+        # name does not exist
+        if debug: 
+            print("NXDOMAIN")
+        pass
+    except dns.resolver.NoAnswer:
+        # no results for this type
+        if debug: 
+            print("NoAnswer")
+        pass
+    
+    return result
+
+def main():
+    # Step 1: Get zone, authoritative DNS server, and port
+    zone = input("Enter the zone to verify: ")
+    dnsServerInput = input("Enter the authoritative DNS server (name or IP): ")
+    dnsServerPort = int(input("Enter the DNS server port (default 53): ") or 53)
+
+    # Look up DNS server IP if given as a name
+    try:
+        if dnsServerInput.replace('.', '').isnumeric():
+            dnsServerIp = dnsServerInput
+        else:
+            # dnsServerIp = dns.resolver.resolve(dnsServerInput, 'A')[0].address
+            dnsServerIp = getCurrentDNS(dnsServerInput, 'A')[0]
+        print(f"Using DNS server: {dnsServerIp}:{dnsServerPort}")
+    except dns.exception.DNSException as e:
+        print(f"Error resolving DNS server IP: {e}")
+        return
+
+    # Step 2: Verify SOA record query
+    try:
+        # soaResponse = dns.resolver.resolve(zone, 'SOA', source=dnsServerIp, port=dnsServerPort)
+        # soaRecord = soaResponse.response.authority[0].to_text()
+        soaRecord = getCurrentDNS(zone, 'SOA', dnsServerIp, dnsServerPort)
+        if (len(soaRecord) == 1):
+            print("Zone SOA query successful.")
+            if debug: 
+                print(soaRecord)
+            serialNumber = soaRecord[0].split(' ')[2]
+            print(f"Serial number: {serialNumber}")
+        else:
+            print("Zone SOA query failed.")
+            return
+    except dns.exception.DNSException as e:
+        print(f"SOA record query failed: {e}")
+        return
+
+    # Step 3: Collect dynamic DNS update info
+    keyName = input("Enter the dynamic DNS key name: ")
+    secretKey = input("Enter the secret key: ")
+    algorithm = input("Enter the algorithm (default: hmac-sha256): ") or 'hmac-sha256'
+
+    testLookupName = f"nsupdate-check-test.{zone}"
+    testUpdateName = f"{testLookupName}."
+
+    # Step 4: Add A record
+    aRecordExample = '86.75.30.9'
+    update = dns.update.Update(zone, keyring=dns.tsigkeyring.from_text({keyName: secretKey}))
+    update.delete(testUpdateName, 'A')
+    update.add(testUpdateName, 300, 'A', aRecordExample)
+
+    try:
+        response = dns.query.tcp(update, dnsServerIp, port=dnsServerPort)
+        print("A record added successfully.")
+        if debug:
+            print(response.to_text())
+    except dns.exception.DNSException as e:
+        print(f"Failed to add A record: {e}")
+        return
+
+    # Verify A record value
+    try:
+        # aRecordValue = dns.resolver.resolve(dnsUpdateName, 'A', source=dnsServerIp, port=dnsServerPort)[0].address
+        aRecordValue = getCurrentDNS(testLookupName, 'A', nameServerIP=dnsServerIp, nameServerPort=dnsServerPort, recursive=False)[0]
+        if (aRecordValue == aRecordExample):
+            print("A record value verified.")
+        else:
+            print(f"A record value verification failed. Expected: {aRecordExample}, Actual: {aRecordValue}")
+    except dns.exception.DNSException as e:
+        print(f"A record value verification failed: {e}") 
+
+    # Step 5: Add TXT record
+    update = dns.update.Update(zone, keyring=dns.tsigkeyring.from_text({keyName: secretKey}))
+    txtRecordData = "\"Testing dynamic DNS updates\""
+
+    update.delete(testUpdateName, 'TXT')
+    update.add(testUpdateName, 30, 'TXT', txtRecordData)
+
+    try:
+        response = dns.query.tcp(update, dnsServerIp, port=dnsServerPort)
+        print("TXT record added successfully.")
+        if debug:
+            print(response.to_text())
+    except dns.exception.DNSException as e:
+        print(f"Failed to add TXT record: {e}")
+        return
+
+    # Verify TXT record value
+    try:
+        # txtRecordValue = dns.resolver.resolve(dnsUpdateName, 'TXT', source=dnsServerIp, port=dnsServerPort)[0].strings[0].decode('utf-8')
+        txtRecordValue = getCurrentDNS(testLookupName, 'TXT', nameServerIP=dnsServerIp, nameServerPort=dnsServerPort, recursive=False)[0]
+        if (txtRecordValue == txtRecordData):
+            print("TXT record value verified.")
+        else:
+            print(f"TXT record value verification failed. Expected: {txtRecordData}, Actual: {txtRecordValue}")
+    except dns.exception.DNSException as e:
+        print(f"TXT record value verification failed: {e}")
+
+    # Step 6: Clean up by deleting records
+    update = dns.update.Update(zone, keyring=dns.tsigkeyring.from_text({keyName: secretKey}))
+    update.delete(testUpdateName, 'A')
+    update.delete(testUpdateName, 'TXT')
+
+    try:
+        response = dns.query.tcp(update, dnsServerIp, port=dnsServerPort)
+        print("Records deleted successfully.")
+        if debug:
+            print(response.to_text())
+    except dns.exception.DNSException as e:
+        print(f"Failed to delete records: {e}")
+        return
+
+    # Step 7: Get and display new serial number
+    try:
+        # soaResponse = dns.resolver.resolve(zone, 'SOA', source=dnsServerIp, port=dnsServerPort)
+        # soaRecord = soaResponse.response.authority[0].to_text()
+        newSoaRecord = getCurrentDNS(zone, 'SOA', dnsServerIp, dnsServerPort)
+        if (len(newSoaRecord) == 1):
+            print("Zone SOA query successful.")
+            if debug:
+                print(newSoaRecord)
+            newSerialNumber = newSoaRecord[0].split(' ')[2]
+            print(f"New serial number: {newSerialNumber}")
+            serialNumberDifference = int(newSerialNumber) - int(serialNumber)
+            print(f"Number of updates: {serialNumberDifference}")
+        else:
+            print("Zone SOA query failed.")
+            return
+    except dns.exception.DNSException as e:
+        print(f"SOA record query failed: {e}")
+        return
+
+    # Display output for dyndns configuration
+    print("")
+    print("Dynamic DNS update tests successful.")
+    print("Do the following to configure for dyndns:")
+    print("")
+
+    print(f"Create a key file named {zone}.key with the following line:")
+    print(f"{algorithm}:{keyName}:{secretKey}")
+
+    print("")
+
+    print("Add the following line to zoneInfo.csv:")
+    print(f"{zone},{dnsServerIp},{dnsServerPort},{zone}.key")
+
+if __name__ == "__main__":
+    main()
