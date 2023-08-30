@@ -3,8 +3,77 @@ import dns.query
 import dns.tsigkeyring
 import dns.update
 import dns.resolver
+import os
+import sys
+import csv
 
 debug = False
+
+ddBaseDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dataDir = f"{ddBaseDir}/data"
+secureDir = f"{ddBaseDir}/secure"
+zoneInfoFilename = f"{dataDir}/zoneInfo.csv"
+
+
+def problemStop(str):
+    print(str)
+    sys.exit()
+
+# finds the given zone in the csv file
+def getZoneInfo(zone):
+    try:
+        if debug:
+            print(zoneInfoFilename)
+
+        with open(zoneInfoFilename, 'r') as f:
+            data = csv.reader(f)
+
+            for row in data:
+                if (len(row) == 4):
+                    name,nameServerIP,nameServerPort,keyFile = row
+                    if (name == zone):
+                        thisZone = { "name": name, "nameServerIP": nameServerIP, "nameServerPort": int(nameServerPort), "keyFile": keyFile}
+                        return thisZone
+
+        return None
+
+    except Exception as e:
+        problemStop(f"getZoneInfo: {str(e)}")
+
+# gets the secure key information for a given zone
+# keyfile is in the format:
+# algorithm:keyname:secretkey
+def getTsigKey(zoneInfo):
+    try:
+        keyPath = f'{secureDir}/{zoneInfo["keyFile"]}'
+        if debug:
+            print(keyPath)
+        with open(keyPath, 'r') as file:
+            line = file.readline().strip()
+            if debug:
+                print(line)
+            fields = line.split(':')
+            
+            if len(fields) != 3:
+                if debug:
+                    print("not 3 fields")
+                raise ValueError("Key file should contain exactly 3 colon-separated fields.")
+            
+            algorithm, id_, secret = fields
+            resultDict = {
+                "algorithm": algorithm,
+                "id": id_,
+                "secret": secret
+            }
+            return resultDict
+    except FileNotFoundError:
+        print(f"Key file not found: {keyPath}")
+        return None
+    except ValueError as e:
+        print(str(e))
+        return None
+    except Exception as e:
+        problemStop(f"getTsigKey: {str(e)}")
 
 # simple dns lookup that returns the list of values
 def getCurrentDNS(queryHostname,recordType='A',nameServerIP=None,nameServerPort=53,recursive=True):
@@ -43,11 +112,53 @@ def getCurrentDNS(queryHostname,recordType='A',nameServerIP=None,nameServerPort=
     
     return result
 
+def getInput(prompt,default=None):
+    if (default):
+        defaultStr = f" ({default})"
+    else:
+        defaultStr = ""
+    result = input(f"{prompt}{defaultStr}: ") or default
+    return result
+
 def main():
     # Step 1: Get zone, authoritative DNS server, and port
-    zone = input("Enter the zone to verify: ")
-    dnsServerInput = input("Enter the authoritative DNS server (name or IP): ")
-    dnsServerPort = int(input("Enter the DNS server port (default 53): ") or 53)
+    zone = getInput("Zone to verify")
+    if (zone == None):
+        print("zone required.")
+        return
+    
+    testExisting = False
+
+    zoneInfo = getZoneInfo(zone)
+    if (zoneInfo):
+        tsigKey = getTsigKey(zoneInfo)
+    else:
+        tsigKey = None
+
+    if (zoneInfo and tsigKey):
+        testResponse = getInput("Would you like to test existing configuration?", "Y").upper()[:1]
+        if (testResponse == "Y"):
+            testExisting = True
+
+    if (zoneInfo):
+        defaultValue = zoneInfo["nameServerIP"]
+    else:
+        defaultValue = None
+
+    if (testExisting):
+        dnsServerInput = defaultValue
+    else:
+        dnsServerInput = getInput(f"Authoritative DNS server name or IP", defaultValue)
+
+    if (zoneInfo):
+        defaultValue = zoneInfo["nameServerPort"]
+    else:
+        defaultValue = 53
+
+    if (testExisting):
+        dnsServerPort = defaultValue
+    else:
+        dnsServerPort = int(getInput("Authoritative DNS server port", str(defaultValue)))
 
     # Look up DNS server IP if given as a name
     try:
@@ -56,10 +167,11 @@ def main():
         else:
             # dnsServerIp = dns.resolver.resolve(dnsServerInput, 'A')[0].address
             dnsServerIp = getCurrentDNS(dnsServerInput, 'A')[0]
-        print(f"Using DNS server: {dnsServerIp}:{dnsServerPort}")
     except dns.exception.DNSException as e:
         print(f"Error resolving DNS server IP: {e}")
         return
+
+    print(f"Using DNS server: {dnsServerIp}:{dnsServerPort}")
 
     # Step 2: Verify SOA record query
     try:
@@ -79,10 +191,37 @@ def main():
         print(f"SOA record query failed: {e}")
         return
 
-    # Step 3: Collect dynamic DNS update info
-    keyName = input("Enter the dynamic DNS key name: ")
-    secretKey = input("Enter the secret key: ")
-    algorithm = input("Enter the algorithm (default: hmac-sha256): ") or 'hmac-sha256'
+    # Step 3: Collect dynamic DNS key info
+
+    if (tsigKey):
+        defaultValue = tsigKey["id"]
+    else:
+        defaultValue = ""
+
+    if (testExisting):
+        keyName = defaultValue
+    else:
+        keyName = getInput("Dynamic DNS key name", defaultValue)
+
+    if (tsigKey):
+        defaultValue = tsigKey["secret"]
+    else:
+        defaultValue = ""
+
+    if (testExisting):
+        secretKey = defaultValue
+    else:
+        secretKey = getInput("Dynamic DNS secret key", defaultValue)
+
+    if (tsigKey):
+        defaultValue = tsigKey["algorithm"]
+    else:
+        defaultValue = "hmac-sha256"
+
+    if (testExisting):
+        algorithm = defaultValue
+    else:
+        algorithm = getInput("Dynamic DNS key algorithm", defaultValue)
 
     testLookupName = f"nsupdate-check-test.{zone}"
     testUpdateName = f"{testLookupName}."
@@ -177,16 +316,19 @@ def main():
     # Display output for dyndns configuration
     print("")
     print("Dynamic DNS update tests successful.")
-    print("Do the following to configure for dyndns:")
-    print("")
 
-    print(f"Create a key file named {zone}.key with the following line:")
-    print(f"{algorithm}:{keyName}:{secretKey}")
+    if (not testExisting):
+        print("")
+        print("Do the following to configure for dyndns:")
+        print("")
 
-    print("")
+        print(f"Create a key file named {zone}.key with the following line:")
+        print(f"{algorithm}:{keyName}:{secretKey}")
 
-    print("Add the following line to zoneInfo.csv:")
-    print(f"{zone},{dnsServerIp},{dnsServerPort},{zone}.key")
+        print("")
+
+        print("Add the following line to zoneInfo.csv:")
+        print(f"{zone},{dnsServerIp},{dnsServerPort},{zone}.key")
 
 if __name__ == "__main__":
     main()
