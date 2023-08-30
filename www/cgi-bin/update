@@ -286,7 +286,6 @@ def getTsigKey(zoneInfo):
             return resultDict
     except:
         problemStop("getTsigKey")
-    return data
 
 # server headers that will (attempt to) prevent a browser from caching results
 def printNoCacheHeaders():
