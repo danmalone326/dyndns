@@ -190,7 +190,7 @@ johndoe,*.updatedomain.com,updatedomain.com
 ### Configuring a new zone for Dynamic DNS updates
 Each (sub)domain that will be allowed for updates must first be configured on an authoritative DNS server. In this document, we configure DNS to allow updates to the entire zone, even though we may limit the update using the authorizations above. You may want to consider additional security to limit what hostnames can be updated. Another option is to create a subdomain zone that allows updates only. 
 
-- Configure Authoritative DNS Server for Secure Dynamic Updates. These guides should help but additional configuration may be necessary for your setup.
+1. Configure Authoritative DNS Server for Secure Dynamic Updates. These guides should help but additional configuration may be necessary for your setup.
     - <details>
         <summary>Configure Bind9 for Dynamic DNS</summary>
 
@@ -269,24 +269,41 @@ Each (sub)domain that will be allowed for updates must first be configured on an
         - Restart the knot service.
         </details>
 
-- Test an update via command line before continuing. 
-    - This can be difficult to troubleshoot. Check `/var/log/syslog`
-    - Testing updates from the DNS server may require different IP addresses in the acl. 
-    - Individual zone files must be in a location the DNS server has permisison to update. File system permissions and AppArmor can get in the way, e.g. zone files should not be in `/etc/...` directories. 
-    - Here is an example dynamic DNS update using `nsupdate`.
-        ```
-        $ nsupdate
-        > server 127.0.0.1
-        > zone updatedomain.com
-        > key hmac-sha256:myUniqueKeyID oZYLbK4wx0dhCcv++HIsBIeQDK0=
-        > add jenny.updatedomain.com 30 A 86.75.30.9
-        > send
-        (pause here and verify the update)
-        > delete jenny.updatedomain.com
-        > send
-        > quit
-        ```
-- Make the zone available in the dyndns web service
+    - <details>
+        <summary>Test from the dns server</summary>
+
+        - This can be difficult to troubleshoot. Check `/var/log/syslog`
+        - Testing updates from the DNS server may require different IP addresses in the acl. 
+        - Individual zone files must be in a location the DNS server has permisison to update. File system permissions and AppArmor can get in the way, e.g. zone files should not be in `/etc/...` directories. 
+        - Here is an example dynamic DNS update using `nsupdate`.
+            ```
+            $ nsupdate
+            > server 127.0.0.1
+            > zone updatedomain.com
+            > key hmac-sha256:myUniqueKeyID oZYLbK4wx0dhCcv++HIsBIeQDK0=
+            > add jenny.updatedomain.com 30 A 86.75.30.9
+            > send
+            (pause here and verify the update)
+            > delete jenny.updatedomain.com
+            > send
+            > quit
+            ```
+        </details>
+
+2. Test from the server where the dyndns web service is running
+    - The included script `bin/nsupdate-check` can be used to verify dynamic updates are configured correctly
+    - The script will ask for 6 values
+        1. the dns zone to test
+        2. the name or IP address of the DNS server to send updates for the zone
+        3. the port to use for the DNS updates
+        4. the tsig key algorithm
+        5. the tsig key name/id
+        6. the tsig secret key
+    - There are 2 modes of operation
+        1. If the zone has already configured in the dyndns web service, you will be asked if you want to verify the current configuration. If yes, the configuration will be read and then the tests will be performed.
+        2. If the zone is not configured in the dyndns web service, or you choose not to test the current configuration, you will be prompted for each of the values. A series of tests will be performed to validate the given values and verify the DNS server is accepting updates. When complete, updates to the dyndns web server configuration will be provided. 
+
+3. Make the zone available in the dyndns web service
     - Create a key file in the `secure` directory. This key file needs a unique name and should have a `.key` extension, e.g. `updatedomain.com.key`. This key file contains a single line with values for algorithm, keyname, and secretkey separated by colons.
         ```
         hmac-sha256:myUniqueKeyName:oZYLbK4wx0dhCcv++HIsBIeQDK0=
