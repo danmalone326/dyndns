@@ -152,7 +152,7 @@ def main():
     # get zone, authoritative DNS server, and port
 
     # first we get the zone
-    zone = getInput("Zone to verify","local.dns")
+    zone = getInput("Zone to verify")
     if (zone == None):
         print("zone required.")
         return
@@ -171,10 +171,10 @@ def main():
     else:
         tsigKey = None
 
-    # if (zoneInfo and tsigKey):
-    #     testResponse = getInput("Would you like to test existing configuration?", "Y").upper()[:1]
-    #     if (testResponse == "Y"):
-    #         testExisting = True
+    if (zoneInfo and tsigKey):
+        testResponse = getInput("Would you like to test existing configuration?", "Y").upper()[:1]
+        if (testResponse == "Y"):
+            testExisting = True
 
     # get the authoritative dns server name/ip
     if (zoneInfo):
