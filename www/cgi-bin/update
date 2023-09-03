@@ -162,7 +162,7 @@ def getDeleteParam():
     deleteAll = formFields.get("delete",[])
     if (len(deleteAll) > 0):
         for deleteOne in deleteAll:
-            for value in deleteOne.split(','):
+            for value in deleteOne.upper().split(','):
                 if ((value in allowedDeleteValues) and (value not in result)):
                     result.append(value)
                 elif (value == "ALL"):
