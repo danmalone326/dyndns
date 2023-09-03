@@ -6,7 +6,7 @@ This project implements a personal dynamic DNS web service using a paired down, 
 
 You can use one of the popular dynamic DNS clients, e.g. [ddclient](https://github.com/ddclient/ddclient), or configure your router with its built in options.
 
-### Configuring a Router
+### Configuring Dynamic DNS Clients
 
 Some routers support a generic dynamic dns provider. You may be able to select one of the services that support the dyndns protocol, such as dyndns or noip.
 
@@ -15,6 +15,8 @@ You will need to enter the following information
 - Username - Your credentials for this service
 - Password - Your credentials for this service
 - Server - the server hosting the personal dynamic DNS web service 
+
+Help for some known routers/clients can be found here: [etc/clients]
 
 ### Using the API directly
 
