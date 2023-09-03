@@ -16,7 +16,7 @@ You will need to enter the following information
 - Password - Your credentials for this service
 - Server - the server hosting the personal dynamic DNS web service 
 
-Help for some known routers/clients can be found here: [etc/clients]
+Help for some known routers/clients can be found here: [etc/clients/](etc/clients/)
 
 ### Using the API directly
 
