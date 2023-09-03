@@ -22,6 +22,25 @@ def problemStop(str):
     print(str)
     sys.exit()
 
+# returns true if the string is an IPv4 Address
+def isValidIPv4Address(str):
+    try:
+        dns.ipv4.inet_aton(str)
+        return True
+    except:
+        return False
+
+# returns true if the string is an IPv6 Address
+def isValidIPv6Address(str):
+    try:
+        dns.ipv6.inet_aton(str, True)
+        return True
+    except:
+        return False
+    
+def isValidIPAddress(str):
+    return isValidIPv4Address(str) or isValidIPv6Address(str)
+
 # finds the given zone in the csv file
 def getZoneInfo(zone):
     try:
@@ -33,9 +52,15 @@ def getZoneInfo(zone):
 
             for row in data:
                 if (len(row) == 4):
-                    name,nameServerIP,nameServerPort,keyFile = row
+                    name,nameServer,nameServerPort,keyFile = row
+
                     if (name == zone):
-                        thisZone = { "name": name, "nameServerIP": nameServerIP, "nameServerPort": int(nameServerPort), "keyFile": keyFile}
+                        if (isValidIPAddress(nameServer)):
+                            nameServerIP = nameServer
+                        else:
+                            nameServerIP = getCurrentDNS(nameServer, 'A')[0]
+
+                        thisZone = { "name": name, "nameServer": nameServer, "nameServerIP": nameServerIP, "nameServerPort": int(nameServerPort), "keyFile": keyFile}
                         return thisZone
 
         return None
@@ -153,7 +178,7 @@ def main():
 
     # get the authoritative dns server name/ip
     if (zoneInfo):
-        defaultValue = zoneInfo["nameServerIP"]
+        defaultValue = zoneInfo["nameServer"]
     else:
         # try to get a default value for authoritative name server
         try:
@@ -174,10 +199,9 @@ def main():
 
     # look up authoritative dns server ip if given as a name
     try:
-        if dnsServerInput.replace('.', '').isnumeric():
+        if (isValidIPAddress(dnsServerInput)):
             dnsServerIp = dnsServerInput
         else:
-            # dnsServerIp = dns.resolver.resolve(dnsServerInput, 'A')[0].address
             dnsServerIp = getCurrentDNS(dnsServerInput, 'A')[0]
     except dns.exception.DNSException as e:
         print(f"Error resolving DNS server IP: {e}")
@@ -370,7 +394,7 @@ def main():
         print("")
 
         print("Add the following line to zoneInfo.csv:")
-        print(f"{zone},{dnsServerIp},{dnsServerPort},{zone}.key")
+        print(f"{zone},{dnsServerInput},{dnsServerPort},{zone}.key")
 
 if __name__ == "__main__":
     try:

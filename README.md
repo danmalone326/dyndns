@@ -312,9 +312,9 @@ Each (sub)domain that will be allowed for updates must first be configured on an
         sudo chown --reference secure/htpasswd secure/updatedomain.com.key
         sudo chmod --reference secure/htpasswd secure/updatedomain.com.key
         ```
-    - Add an entry in the `data/zoneInfo.csv` configuration. The IP address and port are of the authoritative DNS server that will accept the dynamic updates. The IP address may be localhost if running on the same server.
+    - Add an entry in the `data/zoneInfo.csv` configuration. The name server and port are of the authoritative DNS server that will accept the dynamic updates. The IP address may be localhost if running on the same server.
         ```
-        name,nameServerIP,nameServerPort,keyFile
+        name,nameServer,nameServerPort,keyFile
         updatedomain.com,127.0.0.1,53,updatedomain.com.key
         ```
 

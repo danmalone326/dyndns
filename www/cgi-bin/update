@@ -204,9 +204,15 @@ def getZoneInfo(zone):
 
             for row in data:
                 if (len(row) == 4):
-                    name,nameServerIP,nameServerPort,keyFile = row
+                    name,nameServer,nameServerPort,keyFile = row
+
                     if (name == zone):
-                        thisZone = { "name": name, "nameServerIP": nameServerIP, "nameServerPort": int(nameServerPort), "keyFile": keyFile}
+                        if (isValidIPAddress(nameServer)):
+                            nameServerIP = nameServer
+                        else:
+                            nameServerIP = getCurrentDNS(nameServer, 'A')[0]
+                            
+                        thisZone = { "name": name, "nameServer": nameServer, "nameServerIP": nameServerIP, "nameServerPort": int(nameServerPort), "keyFile": keyFile}
                         return thisZone
 
         problemStop("getZoneInfo 1")     
@@ -231,20 +237,27 @@ def isAuthorizedHostname(hostname,allowedPatterns):
         return False
 
 # simple dns lookup that returns the list of values
-def getCurrentDNS(hostname,recordType,nameServerIP,nameServerPort):
+def getCurrentDNS(queryHostname,recordType='A',nameServerIP=None,nameServerPort=53,recursive=True):
     resolver = dns.resolver.Resolver()
-    resolver.nameservers = [nameServerIP]
-    resolver.port = nameServerPort
+
+    if (nameServerIP!=None):
+        resolver.nameservers = [nameServerIP]
+        resolver.port = nameServerPort
     # resolver.no_recurse = True
-    resolver.set_flags(0b0000000000000000)
+    if (not recursive):
+        resolver.set_flags(0b0000000000000000)
     
     if debug:
+        print(queryHostname)
+        print(recordType)
         print(resolver.nameservers)
         print(resolver.port)
 
     result = []
     try:
-        answers = resolver.query(hostname, rdtype=recordType)
+        answers = resolver.query(queryHostname, rdtype=recordType)
+        if debug:
+            print(str(len(answers)) + " Answers")
         # put the values for each of the answers into the list
         result.extend(str(answer) for answer in answers)
     except dns.resolver.NXDOMAIN:
@@ -327,8 +340,8 @@ def updateIPs(hostname, ipList, zoneInfo):
     hostnameObj = dns.name.from_text(hostname)
 
     # get the current values from dns for comparison
-    currentIPs = getCurrentDNS(hostnameObj,"A",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"])
-    currentIPs.extend(getCurrentDNS(hostnameObj,"AAAA",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"]))
+    currentIPs = getCurrentDNS(hostnameObj,"A",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"],recursive=False)
+    currentIPs.extend(getCurrentDNS(hostnameObj,"AAAA",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"],recursive=False))
 
     if debug:
         print(currentIPs)
@@ -383,7 +396,7 @@ def updateTXT(hostname, newTXTs, zoneInfo):
     hostnameObj = dns.name.from_text(hostname)
 
     # get the current values from dns for comparison
-    currentTXTs = getCurrentDNS(hostnameObj,"TXT",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"])
+    currentTXTs = getCurrentDNS(hostnameObj,"TXT",zoneInfo["nameServerIP"],zoneInfo["nameServerPort"],recursive=False)
 
     if debug:
         print(currentTXTs)
@@ -434,7 +447,7 @@ def delete(hostname, deleteTypes, zoneInfo):
     # see if there are any current values that need to be deleted
     deletesNeeded = False
     for type in deleteTypes:
-        if (len(getCurrentDNS(hostnameObj,type,zoneInfo["nameServerIP"],zoneInfo["nameServerPort"])) > 0):
+        if (len(getCurrentDNS(hostnameObj,type,zoneInfo["nameServerIP"],zoneInfo["nameServerPort"],recursive=False)) > 0):
             deletesNeeded = True
             break
     
