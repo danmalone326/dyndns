@@ -146,16 +146,26 @@ def main():
     else:
         tsigKey = None
 
-    if (zoneInfo and tsigKey):
-        testResponse = getInput("Would you like to test existing configuration?", "Y").upper()[:1]
-        if (testResponse == "Y"):
-            testExisting = True
+    # if (zoneInfo and tsigKey):
+    #     testResponse = getInput("Would you like to test existing configuration?", "Y").upper()[:1]
+    #     if (testResponse == "Y"):
+    #         testExisting = True
 
     # get the authoritative dns server name/ip
     if (zoneInfo):
         defaultValue = zoneInfo["nameServerIP"]
     else:
-        defaultValue = None
+        # try to get a default value for authoritative name server
+        try:
+            soaRecord = getCurrentDNS(zone, 'SOA')
+            if (len(soaRecord) == 1):
+                if debug: 
+                    print(soaRecord)
+                defaultValue = soaRecord[0].split(' ')[0][:-1]
+            else:
+                defaultValue = None
+        except:
+            defaultValue = None
 
     if (testExisting):
         dnsServerInput = defaultValue
@@ -242,6 +252,7 @@ def main():
     # create the tsig keyring 
     try:
         keyring=dns.tsigkeyring.from_text({keyName: secretKey})
+        keyring["algorithm"] = algorithm.lower()
     except binascii.Error:
         print("There is a problem with the secret key.")
         return
@@ -362,4 +373,8 @@ def main():
         print(f"{zone},{dnsServerIp},{dnsServerPort},{zone}.key")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("")
+        pass
