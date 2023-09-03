@@ -2,14 +2,13 @@
 
 This project implements a personal dynamic DNS web service using a paired down, extended, and combined version of the legacy v2 and v3 dyndns protocols. It was created to allow easy dynamic dns updates to self hosted domains by standard dyndns clients, e.g. home routers. Extensions added help to enable letsencrypt validation of certificates for internal devices that are not accessible outside a home firewall.
 
-
 ## Usage
 
 You can use one of the popular dynamic DNS clients, e.g. [ddclient](https://github.com/ddclient/ddclient), or configure your router with its built in options.
 
 ### Configuring a Router
 
-Most routers will support a generic dynamic dns provider. You may be able to select one of the services that support the dyndns protocol, such as dyndns or noip.
+Some routers support a generic dynamic dns provider. You may be able to select one of the services that support the dyndns protocol, such as dyndns or noip.
 
 You will need to enter the following information
 - Hostname - the fully qualified name that you want to update
@@ -318,3 +317,26 @@ Each (sub)domain that will be allowed for updates must first be configured on an
         name,nameServerIP,nameServerPort,keyFile
         updatedomain.com,127.0.0.1,53,updatedomain.com.key
         ```
+
+# License
+MIT License
+
+Copyright (c) 2023 Dan Malone
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
