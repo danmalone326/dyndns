@@ -1,4 +1,4 @@
-# Configuring UniFi OS for a Custom Dynamic DNS Service
+# Configuring ddclient for a Custom Dynamic DNS Service
 
 During install:
 ```
