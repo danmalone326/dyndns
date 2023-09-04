@@ -4,7 +4,7 @@ This project implements a personal dynamic DNS web service using a paired down, 
 
 ## Usage
 
-You can use one of the popular dynamic DNS clients, e.g. [ddclient](https://github.com/ddclient/ddclient), or configure your router with its built in options.
+You can use one of the popular dynamic DNS clients or configure your router with its built in options.
 
 ### Configuring Dynamic DNS Clients
 
