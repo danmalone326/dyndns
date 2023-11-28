@@ -19,12 +19,11 @@ This can be especially useful when generating certificates on a server on a home
      --domains host.example.com \
      --preferred-challenges dns \
      --authenticator manual \
-     --manual-auth-hook /root/dyndns/certbot-hook \
-     --manual-cleanup-hook /root/dyndns/certbot-hook \
-     --non-interactive \
-     --redirect \
-     --manual-public-ip-logging-ok \
-     --max-log-backups 20
+     --manual-auth-hook /path/to/dyndns/certbot-hook \
+     --manual-cleanup-hook /path/to/dyndns/certbot-hook \
+     --non-interactive
     ```
-- Note, you can not use the built in installer options with the manual authenticator, e.g. --installer apache
+## Notes and Future Work
+- You can not use the built in installer options with the manual authenticator, e.g. --installer apache
   - You may be able to create a --deploy-hook that restarts services after a renewal
+- It may be possible to run certbot one time to use the built in installer, e.g. apache, and then a second time to update the manual hooks.
